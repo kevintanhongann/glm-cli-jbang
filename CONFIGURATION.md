@@ -191,6 +191,33 @@ system_prompt = "You are a helpful Groovy expert."
 stream = true
 ```
 
+### [web_search] - Web Search Configuration
+
+| Key | Type | Default | Description |
+|------|------|---------|-------------|
+| `enabled` | boolean | `true` | Enable/disable web search tool |
+| `default_count` | integer | `10` | Default number of results (1-50) |
+| `default_recency_filter` | string | `"noLimit"` | Default time filter |
+
+#### Recency Filters
+
+| Value | Description |
+|-------|-------------|
+| `noLimit` | All time (default) |
+| `1d` | Last 24 hours |
+| `1w` | Last 7 days |
+| `1m` | Last 30 days |
+| `1y` | Last 365 days |
+
+#### Example
+
+```toml
+[web_search]
+enabled = true
+default_count = 10
+default_recency_filter = "noLimit"
+```
+
 ## Environment Variables
 
 Environment variables override config file settings:
@@ -208,6 +235,9 @@ Environment variables override config file settings:
 | `GLM_LOG_LEVEL` | `logging.level` | Log level |
 | `GLM_LOG_FILE` | `logging.file` | Log file path |
 | `GLM_SYSTEM_PROMPT` | `chat.system_prompt` | System prompt |
+| `GLM_WEB_SEARCH_ENABLED` | `web_search.enabled` | Enable web search (true/false) |
+| `GLM_WEB_SEARCH_COUNT` | `web_search.default_count` | Default result count (1-50) |
+| `GLM_WEB_SEARCH_RECENCY` | `web_search.default_recency_filter` | Default time filter |
 
 ### Setting Environment Variables
 
@@ -217,6 +247,8 @@ Temporary (current session):
 ```bash
 export ZAI_API_KEY=your.api.key.here
 export GLM_DEFAULT_MODEL=glm-4
+export GLM_WEB_SEARCH_ENABLED=true
+export GLM_WEB_SEARCH_COUNT=10
 ```
 
 Permanent (add to `~/.bashrc` or `~/.zshrc`):

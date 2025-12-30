@@ -129,577 +129,248 @@ code .
 }
 ```
 
-### Development Workflow
+## Web Search Tool Development
 
-1. **Edit source files** in appropriate directories
+### Prerequisites
 
-```
-glm-cli-jbang/
-├── commands/     # Modify CLI commands
-├── core/         # Modify core logic
-├── tools/        # Add/modify tools
-└── models/       # Add/modify data models
-```
+- Valid GLM-4 API key with web search permissions
+- Internet connectivity for API access
+- Review [WEB_SEARCH_IMPLEMENTATION.md](./WEB_SEARCH_IMPLEMENTATION.md) for full details
 
-2. **Update dependencies** in `glm.groovy`
+### Testing Web Search
 
-```groovy
-//DEPS new.library:version
-//DEPS another.library:version
-```
-
-3. **Register new sources** in `glm.groovy`
-
-```groovy
-//SOURCES commands/NewCommand.groovy
-//SOURCES core/NewComponent.groovy
-```
-
-4. **Test locally**
+#### Manual Testing
 
 ```bash
-./glm.groovy chat "Test new feature"
+# Basic search
+./glm.groovy agent "Search for recent news about Java 21"
+
+# Domain-filtered search
+./glm.groovy agent "Find documentation on github.com about Groovy 4"
+
+# Recent content search
+./glm.groovy agent "Search for AI news from last week"
+
+# Multiple searches in one task
+./glm.groovy agent "Research latest GLM-4 model features and write a summary"
 ```
 
-5. **Iterate** until satisfied
+#### Debug Web Search Tool
 
-## Debugging
-
-### Enabling Debug Logging
-
-#### Environment Variable
+Enable debug logging:
 
 ```bash
 export GLM_LOG_LEVEL=DEBUG
-./glm.groovy chat "Test"
+./glm.groovy agent "Search for test query"
 ```
 
-#### Config File
+Add logging in `WebSearchClient.groovy`:
+
+```groovy
+String search(String searchQuery, Map<String, Object> options = [:]) {
+    println "DEBUG: Search Query: ${searchQuery}"
+    println "DEBUG: Options: ${options}"
+
+    String jsonBody = mapper.writeValueAsString(requestBody)
+    println "DEBUG: Request Body: ${jsonBody}"
+
+    HttpRequest httpRequest = HttpRequest.newBuilder()
+        .uri(URI.create(BASE_URL))
+        .header("Authorization", "Bearer ${apiKey.take(8)}...")
+        .header("Content-Type", "application/json")
+        .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+        .build()
+
+    HttpResponse<String> response = client.send(httpRequest, HttpResponse.BodyHandlers.ofString())
+    println "DEBUG: Response Status: ${response.statusCode()}"
+    println "DEBUG: Response Length: ${response.body().length()}"
+
+    if (response.statusCode() != 200) {
+        println "DEBUG: Error Response: ${response.body()}"
+        throw new RuntimeException("Web Search API failed with code ${response.statusCode()}")
+    }
+
+    return mapper.readValue(response.body(), WebSearchResponse.class)
+}
+```
+
+### Common Issues
+
+#### API Endpoint Not Found
+
+**Symptoms**: `Error: Failed to connect to web search API`
+
+**Solution**: Verify correct endpoint in `WebSearchClient.groovy`
+
+```bash
+# Test endpoint with curl
+curl -X POST https://api.z.ai/api/tools/web_search \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"search_query":"test"}'
+```
+
+#### Rate Limiting
+
+**Symptoms**: `Error: Too many requests` or HTTP 429
+
+**Solution**: Implement retry logic with exponential backoff
+
+```groovy
+int maxRetries = 3
+long delay = 1000 // 1 second
+
+for (int i = 0; i < maxRetries; i++) {
+    try {
+        return sendRequest()
+    } catch (HttpException e) {
+        if (e.statusCode == 429 && i < maxRetries - 1) {
+            println "Rate limit hit, retrying in ${delay}ms..."
+            Thread.sleep(delay)
+            delay *= 2 // Exponential backoff
+        } else {
+            throw e
+        }
+    }
+}
+```
+
+Add delay between multiple searches:
+
+```groovy
+// In agent loop, after tool call
+if (toolName == "web_search") {
+    Thread.sleep(1000) // 1 second delay
+}
+```
+
+#### Empty Results
+
+**Symptoms**: No search results returned
+
+**Solution**: Verify search query and try alternatives
+
+```bash
+# Test different queries
+./glm.groovy agent "Search for 'xyz123abc'"  # Very specific
+./glm.groovy agent "Search for 'Java 21'"  # Broader
+./glm.groovy agent "Search for 'Java programming'"  # More generic
+```
+
+#### Authentication Errors
+
+**Symptoms**: `Error: Unauthorized (401)`
+
+**Solution**: Check API key and authentication method
+
+```bash
+# Verify API key works for chat
+./glm.groovy chat "test"
+
+# Check if web search uses different auth
+# May need to update WebSearchClient to generate JWT instead of using API key directly
+```
+
+#### Timeout Issues
+
+**Symptoms**: Web search appears to hang or times out
+
+**Solution**: Increase timeout or add configuration
+
+```groovy
+// In WebSearchClient.groovy constructor
+private final HttpClient client
+
+WebSearchClient(String apiKey, int timeoutSeconds = 10) {
+    this.client = HttpClient.newBuilder()
+        .connectTimeout(Duration.ofSeconds(timeoutSeconds))
+        .build()
+}
+```
+
+Add configuration option:
 
 ```toml
-[logging]
-level = "DEBUG"
-file = "/path/to/debug.log"
+[web_search]
+timeout_seconds = 10
 ```
 
-#### Verbosity Flag (if implemented)
+### Test Cases
+
+Run through complete test matrix:
 
 ```bash
-./glm.groovy -v agent "Debug this task"
+#!/bin/bash
+echo "Test 1: Basic search"
+./glm.groovy agent "Search for Java 21 features"
+
+echo -e "\nTest 2: Domain filter"
+./glm.groovy agent "Find docs on spring.io about Spring Boot"
+
+echo -e "\nTest 3: Recency filter"
+./glm.groovy agent "Search for AI news from last week"
+
+echo -e "\nTest 4: Count limit"
+./glm.groovy agent "Search for test query, limit to 3 results"
+
+echo -e "\nTest 5: No results"
+./glm.groovy agent "Search for xyz123abc"
+
+echo -e "\nTest 6: Invalid input"
+./glm.groovy agent "Search for empty query"
+
+echo -e "\nTest 7: Complex task"
+./glm.groovy agent "Research Java 21 features and write summary to summary.md"
 ```
 
-### Debugging Agent Loop
+### Performance Testing
 
-#### Check Conversation History
-
-The agent maintains a conversation history. To inspect:
-
-1. Add logging statement in `Agent.groovy`:
+Measure response times:
 
 ```groovy
-void run(String prompt) {
-    history.add(new Message("user", prompt))
-    println "History size: ${history.size()}"
-    println "Last message: ${history.last()}"
-    // ... rest of code
-}
+long startTime = System.currentTimeMillis()
+def response = client.search("test query")
+long endTime = System.currentTimeMillis()
+long duration = endTime - startTime
+println "Search took ${duration}ms"
 ```
 
-#### Trace Tool Calls
-
-Log tool execution details:
-
-```groovy
-def toolCalls = message.toolCalls
-toolCalls.each { toolCall ->
-    println "Tool called: ${toolCall.function.name}"
-    println "Arguments: ${toolCall.function.arguments}"
-    // ... execute tool
-    println "Result: ${result}"
-}
-```
-
-#### Inspect API Requests
-
-Log request before sending:
-
-```groovy
-String sendMessage(ChatRequest request) {
-    String jsonBody = mapper.writeValueAsString(request)
-    println "Sending request: ${jsonBody}" // Debug log
-    // ... send request
-}
-```
-
-### Common Debugging Scenarios
-
-#### Issue: Tool not found
-
-**Symptoms**: `Error: Tool not found`
-
-**Debug Steps**:
-1. Check tool is registered:
-   ```groovy
-   agent.registerTool(new MyTool())
-   ```
-
-2. Check tool name matches:
-   ```groovy
-   String getName() { "my_tool" } // Must match what LLM calls
-   ```
-
-3. Check tool is in correct package:
-   ```groovy
-   package tools
-   ```
-
-#### Issue: Agent stuck in loop
-
-**Symptoms**: Repeated tool calls without progress
-
-**Debug Steps**:
-1. Add step counter:
-   ```groovy
-   int steps = 0
-   while (steps < maxSteps) {
-       // ... agent logic
-       steps++
-       println "Step ${steps} of ${maxSteps}"
-   }
-   ```
-
-2. Check tool result format:
-   ```groovy
-   // Ensure result is a string
-   return "Success: ${result}"
-   // Not: return result (if result is not string)
-   ```
-
-3. Add max steps limit:
-   ```groovy
-   agent.setMaxSteps(10)
-   ```
-
-#### Issue: Diff shows no changes
-
-**Symptoms**: Write operation shows empty diff
-
-**Debug Steps**:
-1. Check file normalization:
-   ```groovy
-   Path path = Paths.get(pathStr).normalize()
-   println "Normalized path: ${path}"
-   ```
-
-2. Check file exists:
-   ```groovy
-   if (Files.exists(path)) {
-       println "File exists, will show diff"
-   } else {
-       println "New file, will show full content"
-   }
-   ```
-
-3. Check content comparison:
-   ```groovy
-   List<String> original = Files.readAllLines(path)
-   List<String> revised = newContent.lines().toList()
-   println "Original lines: ${original.size()}"
-   println "Revised lines: ${revised.size()}"
-   ```
-
-### Debugging HTTP Requests
-
-#### Enable HTTP Logging
-
-Add logging in `GlmClient.groovy`:
-
-```groovy
-String sendMessage(ChatRequest request) {
-    String jsonBody = mapper.writeValueAsString(request)
-    println "=== HTTP Request ==="
-    println "URL: ${BASE_URL}"
-    println "Headers: Authorization: Bearer ${token.take(8)}..."
-    println "Body: ${jsonBody.take(100)}..."
-    println "==================="
-    // ... send request
-}
-```
-
-#### Inspect Response
-
-```groovy
-HttpResponse<String> response = client.send(httpRequest, HttpResponse.BodyHandlers.ofString())
-println "=== HTTP Response ==="
-println "Status: ${response.statusCode()}"
-println "Body: ${response.body().take(200)}..."
-println "===================="
-```
-
-#### Test API with curl
+Benchmark with different parameters:
 
 ```bash
-# Generate JWT token (debug mode in agent)
-curl -X POST https://open.bigmodel.cn/api/paas/v4/chat/completions \
-  -H "Authorization: Bearer <your-jwt-token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "glm-4-flash",
-    "messages": [{"role": "user", "content": "test"}]
-  }'
+# Test different counts
+time ./glm.groovy agent "Search with count=5"
+time ./glm.groovy agent "Search with count=10"
+time ./glm.groovy agent "Search with count=50"
 ```
 
-## Testing
+### Integration Testing
 
-### Manual Testing
-
-#### Test Chat Command
+Verify tool works in agent loop:
 
 ```bash
-# Simple chat
-./glm.groovy chat "Hello!"
+# Test that agent can use web_search in complex tasks
+./glm.groovy agent "Search for recent documentation about Groovy, then write a guide called groovy_guide.md"
 
-# Specific model
-./glm.groovy chat --model glm-4 "Complex question"
-
-# Interactive mode
-./glm.groovy chat
-# Then type messages interactively
+# Expected behavior:
+# 1. Agent calls web_search
+# 2. Receives search results
+# 3. May call read_file to check if groovy_guide.md exists
+# 4. Calls write_file with formatted content
+# 5. Confirms completion
 ```
 
-#### Test Agent Command
+Test with other tools:
 
 ```bash
-# Simple task
-./glm.groovy agent "Create a test.txt file with Hello World"
+# Combine web_search with read_file
+./glm.groovy agent "Read the README.md and search for any mentioned tools online"
 
-# Complex task
-./glm.groovy agent "Refactor User class and add tests"
+# Combine web_search with write_file
+./glm.groovy agent "Search for best practices and add them to the project guidelines"
 
-# Read-only task
-./glm.groovy agent "Summarize the project structure"
-```
-
-### Test Scenarios
-
-#### File Operations
-
-```bash
-# Create file
-./glm.groovy agent "Create a new file called test.groovy with a Hello World class"
-
-# Read file
-./glm.groovy agent "Read the README.md file and tell me what it's about"
-
-# Modify file
-./glm.groovy agent "Update the README.md to add a new section called 'Testing'"
-
-# Delete file (via agent modifying content)
-./glm.groovy agent "Remove the test.groovy file"
-```
-
-#### Error Handling
-
-```bash
-# Test with invalid path
-./glm.groovy agent "Read /nonexistent/file.txt"
-
-# Test with permission denied
-./glm.groovy agent "Write to /root/test.txt"
-
-# Test with no API key
-unset ZAI_API_KEY
-./glm.groovy chat "Test"
-```
-
-### Adding Automated Tests
-
-#### Test Structure
-
-Create `tests/` directory:
-
-```
-glm-cli-jbang/
-├── tests/
-│   ├── tools/
-│   │   └── ReadFileToolSpec.groovy
-│   ├── core/
-│   │   └── GlmClientSpec.groovy
-│   └── AgentSpec.groovy
-```
-
-#### Example Test (Spock Framework)
-
-```groovy
-// tests/tools/ReadFileToolSpec.groovy
-package tools
-
-import spock.lang.Specification
-
-class ReadFileToolSpec extends Specification {
-    def "read file returns content when file exists"() {
-        given: "a read file tool and test file"
-        def tool = new ReadFileTool()
-        new File("test.txt").write("Hello, World!")
-
-        when: "reading the file"
-        def result = tool.execute([path: "test.txt"])
-
-        then: "content is returned"
-        result.contains("Hello, World!")
-        !result.startsWith("Error:")
-
-        cleanup:
-        new File("test.txt").delete()
-    }
-
-    def "read file returns error when file does not exist"() {
-        given: "a read file tool"
-        def tool = new ReadFileTool()
-
-        when: "reading nonexistent file"
-        def result = tool.execute([path: "nonexistent.txt"])
-
-        then: "error is returned"
-        result.startsWith("Error:")
-        result.contains("not found")
-    }
-}
-```
-
-#### Running Tests
-
-When test framework is integrated:
-
-```bash
-# Run all tests
-./glm.groovy test
-
-# Run specific test file
-./glm.groovy test tests/tools/ReadFileToolSpec.groovy
-
-# Run with coverage
-./glm.groovy test --coverage
-```
-
-## Adding Features
-
-### Adding a New Command
-
-#### Step 1: Create Command Class
-
-```groovy
-// commands/ReviewCommand.groovy
-package commands
-
-import picocli.CommandLine.Command
-import picocli.CommandLine.Option
-import core.GlmClient
-import core.Config
-
-@Command(name = "review", description = "Review code with AI")
-class ReviewCommand implements Runnable {
-
-    @Option(names = ["-f", "--file"], description = "File to review")
-    String filePath
-
-    @Override
-    void run() {
-        Config config = Config.load()
-        String apiKey = System.getenv("ZAI_API_KEY") ?: config.api.key
-
-        if (!apiKey) {
-            System.err.println("Error: API Key required")
-            return
-        }
-
-        if (!filePath) {
-            System.err.println("Error: --file parameter required")
-            return
-        }
-
-        GlmClient client = new GlmClient(apiKey)
-        // ... implement review logic
-    }
-}
-```
-
-#### Step 2: Register Command
-
-Add to `commands/GlmCli.groovy`:
-
-```groovy
-@Command(
-    name = "glm",
-    description = "GLM-4 based AI coding agent",
-    subcommands = [
-        ChatCommand.class,
-        AgentCommand.class,
-        ReviewCommand.class  // Add new command
-    ]
-)
-class GlmCli implements Runnable {
-    // ...
-}
-```
-
-#### Step 3: Add to Sources
-
-Add to `glm.groovy`:
-
-```groovy
-//SOURCES commands/ReviewCommand.groovy
-```
-
-#### Step 4: Test
-
-```bash
-./glm.groovy review --file src/User.groovy
-```
-
-### Adding a New Model
-
-#### Step 1: Create Model Class
-
-```groovy
-// models/ReviewRequest.groovy
-package models
-
-class ReviewRequest {
-    String filePath
-    String guidelines
-
-    ReviewRequest() {}
-
-    ReviewRequest(String filePath, String guidelines) {
-        this.filePath = filePath
-        this.guidelines = guidelines
-    }
-}
-```
-
-#### Step 2: Add Jackson Annotations
-
-```groovy
-import com.fasterxml.jackson.annotation.JsonProperty
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties
-
-@JsonIgnoreProperties(ignoreUnknown = true)
-class ReviewRequest {
-    @JsonProperty("file_path")
-    String filePath
-
-    @JsonProperty("guidelines")
-    String guidelines
-}
-```
-
-## Extending Tools
-
-See [TOOLS.md](./TOOLS.md#creating-custom-tools) for detailed guide.
-
-Quick example:
-
-```groovy
-// tools/GrepTool.groovy
-package tools
-
-class GrepTool implements Tool {
-    @Override
-    String getName() { "grep" }
-
-    @Override
-    String getDescription() {
-        "Search for patterns in file contents"
-    }
-
-    @Override
-    Map<String, Object> getParameters() {
-        return [
-            type: "object",
-            properties: [
-                pattern: [type: "string", description: "Regex pattern"],
-                path: [type: "string", description: "File path"]
-            ],
-            required: ["pattern", "path"]
-        ]
-    }
-
-    @Override
-    Object execute(Map<String, Object> args) {
-        try {
-            String pattern = args.get("pattern")
-            String path = args.get("path")
-            def file = new File(path)
-
-            if (!file.exists()) {
-                return "Error: File not found: ${path}"
-            }
-
-            def matcher = file.text =~ pattern
-            def matches = matcher.findAll()
-            return "Found ${matches.size()} matches:\n${matches.join('\n')}"
-        } catch (Exception e) {
-            return "Error: ${e.message}"
-        }
-    }
-}
-```
-
-## Performance Profiling
-
-### Measuring Startup Time
-
-```bash
-# Time the CLI startup
-time ./glm.groovy --help
-```
-
-Add profiling code:
-
-```groovy
-class Main {
-    static void main(String... args) {
-        long start = System.currentTimeMillis()
-
-        // CLI initialization
-        int exitCode = new CommandLine(new GlmCli()).execute(args)
-
-        long end = System.currentTimeMillis()
-        println "Startup time: ${end - start}ms"
-
-        System.exit(exitCode)
-    }
-}
-```
-
-### Measuring API Latency
-
-```groovy
-class GlmClient {
-    String sendMessage(ChatRequest request) {
-        long start = System.nanoTime()
-
-        // ... send request
-
-        long end = System.nanoTime()
-        double latency = (end - start) / 1_000_000.0
-        println "API latency: ${String.format('%.2f', latency)}ms"
-
-        return response.body()
-    }
-}
-```
-
-### Memory Profiling
-
-```bash
-# Run with JVM memory logging
-java -Xlog:gc* -jar glm-cli.jar --help
-
-# Or use environment variable
-export JAVA_OPTS="-Xlog:gc*"
-./glm.groovy --help
+# Combine web_search with list_files
+./glm.groovy agent "List all .groovy files and search for documentation on Groovy closures"
 ```
 
 ## Best Practices

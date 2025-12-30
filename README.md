@@ -15,7 +15,8 @@ A native-performance AI coding agent CLI for Linux, macOS, and Windows, powered 
 |---------|-------------|
 | **Chat** | Interactive conversation with GLM-4 models (`glm-4-flash`, `glm-4`, `glm-4-plus`, `glm-4.5`) |
 | **Agent** | Autonomous task execution with ReAct loop for reading/writing files |
-| **Tools** | Built-in file system tools (`read_file`, `write_file`, `list_files`) with safety checks |
+| **Web Search** | Integrated web search with real-time information retrieval |
+| **Tools** | Built-in tools (`read_file`, `write_file`, `list_files`, `web_search`) with safety checks |
 | **Streaming** | Real-time response streaming using Server-Sent Events (SSE) |
 | **Diff Preview** | See file changes before applying with diff visualization |
 | **Configurable** | TOML-based configuration for API keys, defaults, and behavior |
@@ -145,7 +146,7 @@ The agent will:
 
 ```bash
 # Refactor code
-glm agent "Extract the validation logic from User.groovy into a separate Validator class"
+glm agent "Extract validation logic from User.groovy into a separate Validator class"
 
 # Add tests
 glm agent "Write comprehensive tests for the payment processing module"
@@ -155,6 +156,9 @@ glm agent "Investigate and fix the null pointer exception in AuthController"
 
 # Documentation
 glm agent "Add JavaDoc comments to all public methods in the API client"
+
+# Research current information
+glm agent "Search for recent news about Java 21 features and summarize"
 ```
 
 ## Agent System
@@ -173,6 +177,7 @@ GLM-CLI uses a **ReAct** (Reasoning + Acting) agent loop:
 | `read_file` | Read file contents | Always allowed |
 | `write_file` | Write/create files with diff preview | Requires confirmation |
 | `list_files` | List directory contents | Always allowed |
+| `web_search` | Search web for current information | Always allowed |
 
 ### Tool Calling Patterns
 
@@ -331,6 +336,7 @@ We welcome contributions! Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for gu
 - [Development Guide](./DEVELOPMENT.md) - Local development setup
 - [Tools Reference](./TOOLS.md) - Complete tool documentation
 - [Configuration Guide](./CONFIGURATION.md) - Detailed configuration options
+- [Web Search Implementation](./WEB_SEARCH_IMPLEMENTATION.md) - Web search tool implementation guide
 - [FAQ](./FAQ.md) - Frequently asked questions
 
 ## License

@@ -253,6 +253,141 @@ Error: Directory not found: /invalid/path
 
 ---
 
+### web_search
+
+**Purpose**: Search the web for current information, news, documentation, or facts.
+
+**Permission Level**: Always allowed
+
+#### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|-------|-----------|---------|-------------|
+| `search_query` | string | Yes | - | The search query string |
+| `count` | integer | No | 10 | Number of results to return (1-50) |
+| `search_domain_filter` | string | No | - | Filter results to specific domain (e.g., www.github.com, spring.io) |
+| `search_recency_filter` | string | No | noLimit | Time-based filter: noLimit, 1d, 1w, 1m, 1y |
+
+#### Examples
+
+```groovy
+// Basic search
+web_search(search_query: "Java 21 features")
+
+// Search with result count limit
+web_search(search_query: "Groovy latest version", count: 5)
+
+// Search specific domain
+web_search(search_query: "Spring Boot", search_domain_filter: "spring.io")
+
+// Search recent content
+web_search(search_query: "AI news", search_recency_filter: "1w")
+
+// Combined filters
+web_search(search_query: "documentation", search_domain_filter: "docs.python.org", count: 3)
+```
+
+#### Returns
+
+**Success**: Formatted search results with title, snippet, URL, and metadata
+
+```
+Found 5 results:
+
+1. Java 21: What's New
+   Java 21 introduces pattern matching, virtual threads, and more...
+   URL: https://example.com/java21
+   Published: 2025-09-20
+   Source: Java Magazine
+
+2. Virtual Threads in Java 21
+   Virtual threads allow millions of concurrent operations...
+   URL: https://example.com/virtual-threads
+   Published: 2025-09-18
+   Source: Tech Blog
+
+3. Pattern Matching for Switch
+   Enhanced pattern matching makes code more concise...
+   URL: https://example.com/pattern-matching
+   Published: 2025-09-15
+   Source: Oracle
+
+...
+```
+
+**Error**: Clear error message
+
+```
+Error performing web search: Failed to connect to API
+```
+
+**No Results**: Informative message
+
+```
+No search results found for query: 'xyz123abc'
+```
+
+**Validation Error**: Input validation failure
+
+```
+Error: count must be between 1 and 50
+```
+
+#### Implementation Details
+
+- **API**: Uses Z.AI Web Search API
+- **Response**: Returns structured results with title, content, link, media, publish_date, icon
+- **Domain Filtering**: Restricts results to specified domain
+- **Time Filtering**: Supports noLimit, 1d, 1w, 1m, 1y options
+- **Result Limiting**: Configurable count (1-50, default: 10)
+- **Content Truncation**: Summarizes content to 200 characters for readability
+- **Error Handling**: Validates parameters and handles network/API errors gracefully
+
+#### Use Cases
+
+- **Research Current Information**: Finding recent documentation or news
+- **Package Version Lookup**: Checking latest package versions
+- **Breaking Changes**: Looking for recent API changes
+- **Trend Research**: Researching current trends in technology
+- **Documentation Search**: Finding official documentation for libraries/frameworks
+- **Bug Investigation**: Searching for known issues and solutions
+- **Learning Resources**: Finding tutorials and examples
+- **Competitive Analysis**: Researching competitors' features
+
+#### Best Practices
+
+1. **Be Specific**: Use precise search terms for better results
+   ```
+   Good: "Java 21 virtual threads performance"
+   Poor: "Java threads"
+   ```
+
+2. **Use Recency Filters**: For time-sensitive queries
+   ```
+   web_search(search_query: "latest news", search_recency_filter: "1w")
+   ```
+
+3. **Limit Domain**: When looking for official documentation
+   ```
+   web_search(search_query: "Spring Security", search_domain_filter: "spring.io")
+   ```
+
+4. **Adjust Count**: Balance between comprehensiveness and context usage
+   ```
+   Quick overview: count=3
+   Comprehensive: count=10
+   ```
+
+5. **Combine with Other Tools**: Search then fetch or summarize
+   ```groovy
+   // Agent workflow: Search → Read → Summarize
+   web_search(search_query: "REST API best practices", count: 5)
+   webfetch(url: result_link)
+   write_file(path: "best_practices.md", content: summary)
+   ```
+
+---
+
 ## Tool Interface
 
 All tools must implement the `Tool` interface:

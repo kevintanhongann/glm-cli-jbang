@@ -63,6 +63,7 @@ Tools extend the agent's capabilities beyond text generation. Use them for:
 - Code execution (bash commands)
 - Content search (grep)
 - Pattern matching (glob)
+- Web search (current information)
 
 #### Parallel Tool Execution
 
@@ -137,6 +138,127 @@ Object execute(Map<String, Object> args) {
     }
 }
 ```
+
+### Web Search Tool Best Practices
+
+Web search enables the agent to access current information from the web.
+
+**When to Use Web Search:**
+
+- Task requires up-to-date information (latest docs, news)
+- Need to check current package versions
+- Researching recent trends or breaking changes
+- Finding recent bug reports or solutions
+- Learning about new libraries or frameworks
+
+**Search Query Best Practices:**
+
+1. **Be Specific**: Use precise, targeted queries
+   ```
+   Good: "Java 21 virtual threads performance"
+   Poor: "Java threads"
+   ```
+
+2. **Provide Context**: Include relevant details in query
+   ```
+   Instead of: "documentation"
+   Use: "REST API documentation for Node.js Express"
+   ```
+
+3. **Use Time Filters**: Apply recency filters appropriately
+   ```
+   - Static concepts (algorithms): noLimit (default)
+   - Fast-changing topics (news): 1w or 1m
+   - Very recent events: 1d
+   ```
+
+4. **Limit Domain**: For official documentation
+   ```
+   web_search(search_query: "React documentation",
+             search_domain_filter: "react.dev")
+   ```
+
+**Example Patterns:**
+
+```groovy
+// Pattern 1: Research and Summarize
+User: "What are new features in Java 21?"
+Agent: [Thinking] Need current information about Java 21
+Agent: [Tool] web_search(search_query: "Java 21 new features", count: 5)
+Result: "Found 5 results about Java 21..."
+Agent: Based on search results, Java 21 introduces virtual threads, pattern matching...
+
+// Pattern 2: Domain-Specific Search
+User: "Check latest Spring Boot docs"
+Agent: [Tool] web_search(search_query: "Spring Boot documentation",
+                         search_domain_filter: "spring.io", count: 5)
+Result: "Found 5 results from spring.io..."
+Agent: Here are the latest Spring Boot documentation updates...
+
+// Pattern 3: Recent Content
+User: "What happened in tech this week?"
+Agent: [Tool] web_search(search_query: "technology news",
+                         search_recency_filter: "1w", count: 10)
+Result: "Found 10 recent news articles..."
+Agent: Here's a summary of this week's technology news...
+
+// Pattern 4: Multi-Search Research
+User: "Research GLM-4 models"
+Agent: [Tool] web_search(search_query: "GLM-4 model comparison")
+Agent: [Tool] web_search(search_query: "GLM-4 features")
+Agent: [Tool] web_search(search_query: "GLM-4 pricing")
+Agent: Based on multiple searches, here's a comprehensive comparison of GLM-4 models...
+
+// Pattern 5: Combined Tool Usage
+User: "Find React docs and add examples to our code"
+Agent: [Tool] web_search(search_query: "React hooks documentation",
+                         search_domain_filter: "react.dev", count: 3)
+Result: "Found 3 documentation pages..."
+Agent: [Tool] read_file(path: "src/ReactExamples.jsx")
+Result: "Read existing examples..."
+Agent: [Tool] write_file(path: "src/ReactExamples.jsx", content: "...")
+```
+
+**Web Search Response Handling:**
+
+```
+Found 5 results:
+
+1. Java 21 Features
+   Java 21 introduces virtual threads, pattern matching...
+   URL: https://example.com/java21
+   Published: 2025-09-20
+
+...
+```
+
+**Tips for Effective Web Search:**
+
+1. **Iterate**: Refine searches based on initial results
+   ```
+   First: web_search(search_query: "Java performance")
+   Then: web_search(search_query: "Java performance optimization tips")
+   ```
+
+2. **Cross-Reference**: Search multiple sources for completeness
+   ```
+   web_search(search_query: "React best practices", search_domain_filter: "react.dev")
+   web_search(search_query: "React best practices", count: 10)
+   Combine results
+   ```
+
+3. **Balance Count**: Adjust based on needs
+   ```
+   Quick overview: count=3
+   Good balance: count=10 (default)
+   Comprehensive: count=20-30
+   Maximum: count=50
+   ```
+
+4. **Follow Up**: Use search results to find more detailed information
+   ```
+   Agent: I found relevant articles. Would you like me to search for more specific topics?
+   ```
 
 ## Agent Configuration
 
