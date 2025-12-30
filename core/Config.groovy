@@ -15,6 +15,15 @@ class Config {
     @JsonProperty("behavior")
     BehaviorConfig behavior = new BehaviorConfig()
 
+    @JsonProperty("web_search")
+    WebSearchConfig webSearch = new WebSearchConfig()
+
+    @JsonProperty("rag")
+    RagConfig rag = new RagConfig()
+
+    @JsonProperty("tui")
+    TuiConfig tui = new TuiConfig()
+
     static class ApiConfig {
         String key
         @JsonProperty("base_url")
@@ -27,6 +36,31 @@ class Config {
         String safetyMode = "ask" // ask, always_allow
         @JsonProperty("default_model")
         String defaultModel = "glm-4-flash"
+    }
+
+    static class WebSearchConfig {
+        Boolean enabled = true
+        @JsonProperty("default_count")
+        Integer defaultCount = 10
+        @JsonProperty("default_recency_filter")
+        String defaultRecencyFilter = "noLimit"
+    }
+
+    static class RagConfig {
+        Boolean enabled = false
+        @JsonProperty("cache_dir")
+        String cacheDir = "~/.glm/embeddings"
+        @JsonProperty("max_chunk_size")
+        Integer maxChunkSize = 500
+        @JsonProperty("min_score")
+        Double minScore = 0.5
+    }
+
+    static class TuiConfig {
+        @JsonProperty("colors_enabled")
+        Boolean colorsEnabled = true
+        @JsonProperty("diff_context_lines")
+        Integer diffContextLines = 3
     }
 
     static Config load() {

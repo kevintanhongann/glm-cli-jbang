@@ -57,12 +57,12 @@
 
 ## Phase 5: Advanced Features (Current Focus)
 - [x] **Documentation**: Create comprehensive implementation plan
-- [ ] **Web Search Tool**: Integrate searching for external docs
-  - [ ] Create WebSearchResponse model
-  - [ ] Implement WebSearchClient
-  - [ ] Create WebSearchTool
-  - [ ] Add configuration options
-  - [ ] Update all documentation
+- [x] **Web Search Tool**: Integrate searching for external docs
+  - [x] Create WebSearchResponse model
+  - [x] Implement WebSearchClient
+  - [x] Create WebSearchTool
+  - [x] Add configuration options
+  - [x] Update all documentation
   - [ ] Write comprehensive tests
-- [ ] **RAG (Retrieval Augmented Generation)**: Simple embedding-based search for large codebases.
-- [ ] **TUI**: Replace standard console I/O with a rich TUI (using `lanterna` or similar) for better diffs.
+- [x] **RAG (Retrieval Augmented Generation)**: Simple embedding-based search for large codebases.
+- [x] **TUI**: Replace standard console I/O with a rich TUI (using `lanterna` or similar) for better diffs.

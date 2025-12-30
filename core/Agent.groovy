@@ -6,11 +6,11 @@ import models.Message
 import tools.Tool
 import com.fasterxml.jackson.databind.ObjectMapper
 
-import com.github.difflib.DiffUtils
-import com.github.difflib.patch.AbstractDelta
-import com.github.difflib.patch.Patch
-import com.github.difflib.text.DiffRow
-import com.github.difflib.text.DiffRowGenerator
+import tui.AnsiColors
+import tui.DiffRenderer
+import tui.InteractivePrompt
+import tui.OutputFormatter
+import tui.ProgressIndicator
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -25,6 +25,7 @@ class Agent {
     Agent(String apiKey, String model) {
         this.client = new GlmClient(apiKey)
         this.model = model
+        AnsiColors.install()
     }
 
     void registerTool(Tool tool) {
@@ -41,13 +42,17 @@ class Agent {
      */
     void run(String prompt) {
         history.add(new Message("user", prompt))
-        println "Agent started with task: ${prompt}"
+        OutputFormatter.printHeader("GLM Agent")
+        OutputFormatter.printInfo("Task: ${prompt}")
 
         while (true) {
             ChatRequest request = prepareRequest()
             
-            println "Thinking..."
+            ProgressIndicator spinner = new ProgressIndicator()
+            spinner.start("Thinking...")
             String responseJson = client.sendMessage(request)
+            spinner.stop(true)
+            
             ChatResponse response = mapper.readValue(responseJson, ChatResponse.class)
             
             def choice = response.choices[0]
@@ -55,23 +60,24 @@ class Agent {
             
             // Print assistant thought (if any content)
             if (message.content) {
-                println "Assistant: ${message.content}"
+                OutputFormatter.printSection("Assistant")
+                println message.content
                 history.add(new Message("assistant", message.content))
             }
 
             if (choice.finishReason == "tool_calls" || (message.toolCalls != null && !message.toolCalls.isEmpty())) {
                 
                 def toolCalls = message.toolCalls
-                 history.add(message)
+                history.add(message)
 
                 toolCalls.each { toolCall ->
                     String functionName = toolCall.function.name
                     String arguments = toolCall.function.arguments
                     String callId = toolCall.id
                     
-                    println "Request to execute tool: ${functionName}"
+                    OutputFormatter.printInfo("Executing tool: ${AnsiColors.bold(functionName)}")
                     
-                    // Safety & Diff Check
+                    // Safety & Diff Check for write_file
                     if (functionName == "write_file") {
                         try {
                             Map<String, Object> args = mapper.readValue(arguments, Map.class)
@@ -79,35 +85,19 @@ class Agent {
                             String newContent = args.get("content")
                             Path path = Paths.get(pathStr).normalize()
                             
-                            println "\n--- Proposed Changes for ${pathStr} ---"
                             if (Files.exists(path)) {
-                                List<String> original = Files.readAllLines(path)
-                                List<String> revised = newContent.lines().toList()
-                                
-                                Patch<String> patch = DiffUtils.diff(original, revised)
-                                if (patch.getDeltas().isEmpty()) {
-                                    println "(No changes detected)"
-                                } else {
-                                    patch.getDeltas().forEach { delta ->
-                                        println "Original: ${delta.getSource()}"
-                                        println "New:      ${delta.getTarget()}"
-                                        println "--------------------------------"
-                                    }
-                                }
+                                String original = Files.readString(path)
+                                println DiffRenderer.renderUnifiedDiff(original, newContent, pathStr)
                             } else {
-                                println "(New File)"
-                                println newContent
+                                OutputFormatter.printInfo("Creating new file: ${pathStr}")
+                                OutputFormatter.printCode(newContent, getFileLanguage(pathStr))
                             }
-                            println "---------------------------------------"
                         } catch (Exception e) {
-                            println "Error generating diff: ${e.message}"
+                            OutputFormatter.printError("Error generating diff: ${e.message}")
                         }
 
-                        System.out.print("Allow write? [y/N]: ")
-                        Scanner scanner = new Scanner(System.in)
-                        String input = scanner.hasNextLine() ? scanner.nextLine().trim() : "n"
-                        if (!input.equalsIgnoreCase("y")) {
-                            println "Action denied by user."
+                        if (!InteractivePrompt.confirm("Apply these changes?")) {
+                            OutputFormatter.printWarning("Action denied by user.")
                             
                             Message toolMsg = new Message()
                             toolMsg.role = "tool"
@@ -132,7 +122,8 @@ class Agent {
                         result = "Error: Tool not found."
                     }
                     
-                    println "Tool Output: ${result}"
+                    OutputFormatter.printSection("Tool Output")
+                    println result
                     
                     Message toolMsg = new Message()
                     toolMsg.role = "tool"
@@ -141,10 +132,22 @@ class Agent {
                     history.add(toolMsg)
                 }
             } else {
-                println "Task completed."
+                OutputFormatter.printSuccess("Task completed.")
                 break
             }
         }
+    }
+    
+    private String getFileLanguage(String path) {
+        if (path.endsWith('.groovy')) return 'groovy'
+        if (path.endsWith('.java')) return 'java'
+        if (path.endsWith('.py')) return 'python'
+        if (path.endsWith('.js')) return 'javascript'
+        if (path.endsWith('.ts')) return 'typescript'
+        if (path.endsWith('.json')) return 'json'
+        if (path.endsWith('.yaml') || path.endsWith('.yml')) return 'yaml'
+        if (path.endsWith('.md')) return 'markdown'
+        return ''
     }
 
     private ChatRequest prepareRequest() {
@@ -165,3 +168,4 @@ class Agent {
         return req
     }
 }
+

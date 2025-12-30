@@ -277,8 +277,8 @@ String apiKey = System.getenv("ZAI_API_KEY") ?: config.api.key
 All dependencies are declared in `glm.groovy`:
 
 ```groovy
-//DEPS info.picocli:picocli:4.7.6
-//DEPS info.picocli:picocli-groovy:4.7.6
+//DEPS info.picocli:picocli:4.7.7
+//DEPS info.picocli:picocli-groovy:4.7.7
 //DEPS com.fasterxml.jackson.core:jackson-databind:2.16.0
 //DEPS com.fasterxml.jackson.dataformat:jackson-dataformat-toml:2.16.0
 //DEPS com.auth0:java-jwt:4.4.0

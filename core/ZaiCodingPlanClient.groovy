@@ -3,10 +3,9 @@
 
 package core
 
-import dev.langchain4j.community.zhipu.*
-import dev.langchain4j.agentic.AgenticServices
-import dev.langchain4j.community.zhipu.model.ZhipuAiChatModel
-import dev.langchain4j.community.zhipu.model.ZhipuAiStreamingChatModel
+import dev.langchain4j.community.model.zhipu.*
+import dev.langchain4j.community.model.zhipu.ZhipuAiChatModel
+import dev.langchain4j.community.model.zhipu.ZhipuAiStreamingChatModel
 import dev.langchain4j.model.chat.*
 import dev.langchain4j.model.output.*
 

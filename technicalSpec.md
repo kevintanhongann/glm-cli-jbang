@@ -18,8 +18,8 @@
 The `glm.groovy` file will declare:
 
 ```groovy
-//DEPS info.picocli:picocli:4.7.6
-//DEPS info.picocli:picocli-groovy:4.7.6
+//DEPS info.picocli:picocli:4.7.7
+//DEPS info.picocli:picocli-groovy:4.7.7
 //DEPS com.fasterxml.jackson.core:jackson-databind:2.16.0
 //DEPS com.fasterxml.jackson.dataformat:jackson-dataformat-toml:2.16.0
 //DEPS org.xerial:sqlite-jdbc:3.44.1.0

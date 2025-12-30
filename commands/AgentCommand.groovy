@@ -1,18 +1,28 @@
 package commands
 
 import picocli.CommandLine.Command
+import picocli.CommandLine.Option
 import picocli.CommandLine.Parameters
 import core.Agent
 import core.Config
 import tools.ReadFileTool
 import tools.WriteFileTool
 import tools.ListFilesTool
+import tools.WebSearchTool
+import tools.CodeSearchTool
+import rag.RAGPipeline
 
 @Command(name = "agent", description = "Run an autonomous agent task", mixinStandardHelpOptions = true)
 class AgentCommand implements Runnable {
 
     @Parameters(index = "0", description = "The task to perform")
     String task
+
+    @Option(names = ["--index-codebase", "-i"], description = "Path to codebase to index for RAG semantic search")
+    String codebasePath
+
+    @Option(names = ["--rag"], description = "Enable RAG-based code search (requires prior indexing)")
+    boolean enableRag = false
 
     @Override
     void run() {
@@ -25,13 +35,26 @@ class AgentCommand implements Runnable {
         }
 
         Agent agent = new Agent(apiKey, "glm-4") // Default to glm-4 for agent, or config.behavior.defaultModel
-        // Ideally agent uses a smarter model by default
 
-        
         // Register standard tools
         agent.registerTool(new ReadFileTool())
         agent.registerTool(new WriteFileTool())
         agent.registerTool(new ListFilesTool())
+        
+        if (config.webSearch.enabled) {
+            agent.registerTool(new WebSearchTool(apiKey))
+        }
+        
+        // RAG integration
+        RAGPipeline ragPipeline = null
+        if (codebasePath || enableRag || config.rag.enabled) {
+            ragPipeline = new RAGPipeline(config.rag.cacheDir)
+            if (codebasePath) {
+                println "Indexing codebase at: ${codebasePath}"
+                ragPipeline.indexCodebase(codebasePath)
+            }
+            agent.registerTool(new CodeSearchTool(ragPipeline))
+        }
         
         try {
             agent.run(task)
@@ -40,3 +63,4 @@ class AgentCommand implements Runnable {
         }
     }
 }
+
