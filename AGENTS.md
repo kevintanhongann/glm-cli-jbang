@@ -330,7 +330,7 @@ The agent system prompt should include:
 Example:
 ```groovy
 String systemPrompt = """
-You are an AI coding agent specialized in Groovy development.
+You are an AI coding agent specialized in software development.
 
 Available tools:
 - read_file: Read file contents
