@@ -31,6 +31,28 @@ class GlmClient {
         this.mapper = new ObjectMapper()
     }
 
+    GlmClient() {
+        this.apiKey = loadApiKey()
+        this.client = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(10))
+            .build()
+        this.mapper = new ObjectMapper()
+    }
+
+    private static String loadApiKey() {
+        def credential = Auth.get("zai")
+        if (credential != null) {
+            return credential.key
+        }
+
+        def envVar = System.getenv("ZAI_API_KEY")
+        if (envVar != null) {
+            return envVar
+        }
+
+        throw new IllegalStateException("No API key found. Use 'glm auth login' to set up authentication or set ZAI_API_KEY environment variable")
+    }
+
     private synchronized String getToken() {
         long now = System.currentTimeMillis()
         if (cachedToken != null && now < tokenExpiryTime) {

@@ -4,6 +4,9 @@
 //DEPS info.picocli:picocli-groovy:4.7.7   
 //DEPS dev.langchain4j:langchain4j-zhipu-ai:0.36.2
 
+// Groovy JSON module (required for JsonSlurper/JsonOutput in Groovy 4.x)
+//DEPS org.apache.groovy:groovy-json:4.0.27
+
 // JWT for ZhipuAI authentication
 //DEPS com.auth0:java-jwt:4.4.0
 
@@ -23,9 +26,12 @@
 //SOURCES commands/GlmCli.groovy
 //SOURCES commands/ChatCommand.groovy
 //SOURCES commands/AgentCommand.groovy
+//SOURCES commands/AuthCommand.groovy
 //SOURCES models/WebSearchResponse.groovy
 //SOURCES core/WebSearchClient.groovy
 //SOURCES tools/WebSearchTool.groovy
+//SOURCES models/Auth.groovy
+//SOURCES core/Auth.groovy
 
 // RAG sources
 //SOURCES rag/CodebaseLoader.groovy

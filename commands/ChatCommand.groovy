@@ -27,14 +27,9 @@ class ChatCommand implements Runnable {
         String apiKey = System.getenv("ZAI_API_KEY") ?: config.api.key
         String modelToUse = model ?: config.behavior.defaultModel
 
-        if (!apiKey) {
-            System.err.println("Error: API Key not found. Set ZAI_API_KEY env var or configure ~/.glm/config.toml")
-            return
-        }
-
-        client = new GlmClient(apiKey)
+        client = apiKey ? new GlmClient(apiKey) : new GlmClient()
         println "Starting chat with model: ${modelToUse} (Type 'exit' or 'quit' to stop)"
-        
+
         // Update local model var for consistency
         this.model = modelToUse
 

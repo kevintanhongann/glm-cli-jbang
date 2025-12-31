@@ -5,7 +5,7 @@ import picocli.CommandLine.Command
 
 @Command(name = "glm", mixinStandardHelpOptions = true, version = "glm-cli 0.1",
         description = "GLM-4 based AI coding agent",
-        subcommands = [ChatCommand.class, AgentCommand.class])
+        subcommands = [ChatCommand.class, AgentCommand.class, AuthCommand.class])
 class GlmCli implements Runnable {
 
     @Override
