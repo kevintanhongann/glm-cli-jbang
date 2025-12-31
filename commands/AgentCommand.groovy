@@ -4,6 +4,7 @@ import picocli.CommandLine.Command
 import picocli.CommandLine.Option
 import picocli.CommandLine.Parameters
 import core.Agent
+import core.Auth
 import core.Config
 import tools.ReadFileTool
 import tools.WriteFileTool
@@ -27,14 +28,23 @@ class AgentCommand implements Runnable {
     @Override
     void run() {
         Config config = Config.load()
-        String apiKey = System.getenv("ZAI_API_KEY") ?: config.api.key
+        
+        // Priority: 1) env var, 2) auth.json (from `glm auth login`), 3) config.toml
+        String apiKey = System.getenv("ZAI_API_KEY")
+        if (!apiKey) {
+            def authCredential = Auth.get("zai")
+            apiKey = authCredential?.key
+        }
+        if (!apiKey) {
+            apiKey = config.api.key
+        }
         
         if (!apiKey) {
-            System.err.println("Error: API Key not found. Set ZAI_API_KEY env var or configure ~/.glm/config.toml")
+            System.err.println("Error: API Key not found. Run 'glm auth login', set ZAI_API_KEY env var, or configure ~/.glm/config.toml")
             return
         }
 
-        Agent agent = new Agent(apiKey, "glm-4") // Default to glm-4 for agent, or config.behavior.defaultModel
+        Agent agent = new Agent(apiKey, "glm-4.7") // Default to glm-4 for agent, or config.behavior.defaultModel
 
         // Register standard tools
         agent.registerTool(new ReadFileTool())

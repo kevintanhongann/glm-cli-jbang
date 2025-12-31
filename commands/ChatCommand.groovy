@@ -3,6 +3,7 @@ package commands
 import picocli.CommandLine.Command
 import picocli.CommandLine.Option
 import picocli.CommandLine.Parameters
+import core.Auth
 import core.GlmClient
 import core.Config
 import models.ChatRequest
@@ -12,8 +13,8 @@ import models.ChatResponse
 @Command(name = "chat", description = "Start a chat session with GLM-4", mixinStandardHelpOptions = true)
 class ChatCommand implements Runnable {
 
-    @Option(names = ["-m", "--model"], description = "Model to use (default: glm-4-flash)")
-    String model = "glm-4-flash"
+    @Option(names = ["-m", "--model"], description = "Model to use (default: glm-4.7)")
+    String model = "glm-4.7"
 
     @Parameters(index = "0", arity = "0..1", description = "Initial message")
     String initialMessage
@@ -24,7 +25,17 @@ class ChatCommand implements Runnable {
     @Override
     void run() {
         Config config = Config.load()
-        String apiKey = System.getenv("ZAI_API_KEY") ?: config.api.key
+        
+        // Priority: 1) env var, 2) auth.json (from `glm auth login`), 3) config.toml
+        String apiKey = System.getenv("ZAI_API_KEY")
+        if (!apiKey) {
+            def authCredential = Auth.get("zai")
+            apiKey = authCredential?.key
+        }
+        if (!apiKey) {
+            apiKey = config.api.key
+        }
+        
         String modelToUse = model ?: config.behavior.defaultModel
 
         client = apiKey ? new GlmClient(apiKey) : new GlmClient()
