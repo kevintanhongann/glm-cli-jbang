@@ -47,6 +47,16 @@
 //SOURCES tui/ProgressIndicator.groovy
 //SOURCES tui/OutputFormatter.groovy
 
+// LSP sources
+//SOURCES models/Diagnostic.groovy
+//SOURCES core/RootDetector.groovy
+//SOURCES core/JsonRpcHandler.groovy
+//SOURCES core/LSPConfig.groovy
+//SOURCES core/LSPServerRegistry.groovy
+//SOURCES core/LSPClient.groovy
+//SOURCES core/LSPManager.groovy
+//SOURCES core/DiagnosticFormatter.groovy
+
 import picocli.CommandLine
 import commands.GlmCli
 
