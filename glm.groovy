@@ -64,6 +64,11 @@
 //SOURCES tui/ProgressIndicator.groovy
 //SOURCES tui/OutputFormatter.groovy
 //SOURCES tui/JexerTUI.groovy
+//SOURCES tui/AutocompleteItem.groovy
+//SOURCES tui/AutocompleteField.groovy
+//SOURCES tui/AutocompletePopup.groovy
+//SOURCES tui/FileProvider.groovy
+//SOURCES tui/CommandProvider.groovy
 
 // LSP sources
 //SOURCES models/Diagnostic.groovy

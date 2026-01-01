@@ -27,6 +27,8 @@ import jexer.bits.Color
 import jexer.bits.ColorTheme
 import javax.imageio.ImageIO
 import java.awt.image.BufferedImage
+import java.nio.file.Files
+import java.nio.file.Paths
 import static jexer.TKeypress.*
 
 /**
@@ -46,7 +48,8 @@ class JexerTUI extends TApplication {
     // UI components
     private TWindow chatWindow
     private TText chatLog
-    private TField inputField
+    private AutocompleteField inputField
+    private AutocompletePopup autocompletePopup
     private TImage logoImage
     private StringBuilder logContent = new StringBuilder()
 
@@ -244,14 +247,29 @@ class JexerTUI extends TApplication {
             chatWindow.getHeight() - logoHeight - 4
         )
 
-        // Create input field at bottom
+        // Create input field at bottom with autocomplete support
         chatWindow.addLabel('You> ', 1, chatWindow.getHeight() - 4)
-        inputField = chatWindow.addField(
-            6, chatWindow.getHeight() - 4,
-            chatWindow.getWidth() - 8,
+        
+        int inputY = chatWindow.getHeight() - 4
+        int inputWidth = chatWindow.getWidth() - 8
+        
+        // Create autocomplete popup (positioned above input)
+        autocompletePopup = new AutocompletePopup(
+            chatWindow,
+            6,
+            inputY - 10  // Above the input field
+        )
+        autocompletePopup.setPopupVisible(false)
+        
+        // Create custom autocomplete field
+        inputField = new AutocompleteField(
+            chatWindow,
+            6, inputY,
+            inputWidth,
             false,
             ''
         )
+        inputField.setPopup(autocompletePopup)
 
         // Handle Enter key on input field
         inputField.setEnterAction(new TAction() {
@@ -260,10 +278,12 @@ class JexerTUI extends TApplication {
             void DO() {
                 String input = inputField.getText().trim()
                 if (!input.isEmpty()) {
+                    // Extract file mentions before clearing
+                    List<String> mentions = inputField.extractMentions()
                     inputField.setText('')
                     // Run in background thread so UI updates immediately
                     Thread.start {
-                        handleInput(input)
+                        handleInput(input, mentions)
                     }
                 }
             }
@@ -305,9 +325,9 @@ class JexerTUI extends TApplication {
     }
 
     /**
-     * Handle user input.
+     * Handle user input with optional file mentions.
      */
-    private void handleInput(String input) {
+    private void handleInput(String input, List<String> mentions = []) {
         // Handle commands
         if (input.equalsIgnoreCase('exit') || input.equalsIgnoreCase('quit')) {
             exit()
@@ -321,46 +341,228 @@ class JexerTUI extends TApplication {
 
         // Add user message to log
         appendLog("You> ${input}")
+        
+        // Show mentioned files
+        if (mentions && !mentions.isEmpty()) {
+            appendLog("  📎 Attached: ${mentions.join(', ')}")
+        }
         appendLog('')
 
-        // Process with AI
-        processInput(input)
+        // Process with AI, including file context
+        processInput(input, mentions)
     }
 
     /**
-     * Handle slash commands.
+     * Handle slash commands with improved parsing.
      */
     private void handleCommand(String cmd) {
-        switch (cmd.toLowerCase()) {
-            case '/help':
+        def parsed = CommandProvider.parse(cmd)
+        if (parsed == null) return
+        
+        String name = parsed.name.toLowerCase()
+        String args = parsed.arguments ?: ''
+        
+        switch (name) {
+            case 'help':
+            case 'commands':
                 appendLog('Commands:')
-                appendLog('  /help  - Show this help')
-                appendLog('  /clear - Clear chat')
-                appendLog('  /model - Show current model')
-                appendLog('  exit   - Exit the TUI')
+                CommandProvider.getCommands().each { item ->
+                    def cmdDef = CommandProvider.get(item.value)
+                    String desc = cmdDef?.description ?: ''
+                    appendLog("  /${item.value.padRight(10)} - ${desc}")
+                }
+                appendLog('')
+                appendLog('File mentions:')
+                appendLog('  @filename   - Attach file to context')
+                appendLog('  @path#L10   - Attach specific line')
+                appendLog('  @path#L1-50 - Attach line range')
                 appendLog('')
                 break
-            case '/clear':
+                
+            case 'clear':
                 logContent = new StringBuilder()
+                appendAsciiArt()
                 appendLog('Chat cleared.')
                 appendLog('')
                 break
-            case '/model':
-                appendLog("Current model: ${currentModel}")
+                
+            case 'model':
+                if (args.isEmpty()) {
+                    appendLog("Current model: ${currentModel}")
+                } else {
+                    currentModel = args
+                    appendLog("Model changed to: ${currentModel}")
+                }
                 appendLog('')
                 break
-            default:
-                appendLog("Unknown command: ${cmd}")
+                
+            case 'models':
+                appendLog('Available models:')
+                appendLog('  glm-4-plus      - High-performance model')
+                appendLog('  glm-4           - Standard model')
+                appendLog('  glm-4-flash     - Fast, cost-effective')
+                appendLog('  glm-4-long      - Extended context')
+                appendLog('  glm-4.7         - Latest version')
                 appendLog('')
+                break
+                
+            case 'cwd':
+                if (args.isEmpty()) {
+                    appendLog("Working directory: ${currentCwd}")
+                } else {
+                    def newDir = new File(args)
+                    if (newDir.isDirectory()) {
+                        currentCwd = newDir.absolutePath
+                        appendLog("Changed to: ${currentCwd}")
+                    } else {
+                        appendLog("Not a directory: ${args}")
+                    }
+                }
+                appendLog('')
+                break
+                
+            case 'ls':
+                String path = args.isEmpty() ? currentCwd : args
+                def dir = new File(path)
+                if (dir.isDirectory()) {
+                    appendLog("Contents of ${path}:")
+                    dir.listFiles()?.sort()?.take(20)?.each { f ->
+                        String icon = f.isDirectory() ? '📁' : '📄'
+                        appendLog("  ${icon} ${f.name}")
+                    }
+                } else {
+                    appendLog("Not a directory: ${path}")
+                }
+                appendLog('')
+                break
+                
+            case 'read':
+                if (args.isEmpty()) {
+                    appendLog('Usage: /read <filename>')
+                } else {
+                    readAndShowFile(args)
+                }
+                appendLog('')
+                break
+                
+            case 'tools':
+                appendLog('Available tools:')
+                tools.each { tool ->
+                    appendLog("  ${tool.name} - ${tool.description?.take(50) ?: ''}")
+                }
+                appendLog('')
+                break
+                
+            case 'context':
+                appendLog("Model: ${currentModel}")
+                appendLog("Working directory: ${currentCwd}")
+                appendLog("Tools: ${tools.size()} registered")
+                appendLog('')
+                break
+                
+            case 'debug':
+                appendLog('Debug mode toggled')
+                appendLog('')
+                break
+                
+            case 'exit':
+                exit()
+                break
+                
+            default:
+                appendLog("Unknown command: /${name}")
+                appendLog("Type /help for available commands")
+                appendLog('')
+        }
+    }
+    
+    /**
+     * Read and display a file with optional line range.
+     */
+    private void readAndShowFile(String pathSpec) {
+        def parsed = FileProvider.extractLineRange(pathSpec)
+        String path = parsed.baseQuery
+        Integer startLine = parsed.startLine
+        Integer endLine = parsed.endLine
+        
+        File file = new File(path)
+        if (!file.isAbsolute()) {
+            file = new File(currentCwd, path)
+        }
+        
+        if (!file.exists()) {
+            appendLog("File not found: ${path}")
+            return
+        }
+        
+        try {
+            List<String> lines = file.readLines()
+            int start = startLine ? Math.max(1, startLine) : 1
+            int end = endLine ? Math.min(lines.size(), endLine) : Math.min(lines.size(), start + 20)
+            
+            appendLog("── ${file.name} (lines ${start}-${end} of ${lines.size()}) ──")
+            for (int i = start - 1; i < end && i < lines.size(); i++) {
+                appendLog("${(i + 1).toString().padLeft(4)}: ${lines[i]}")
+            }
+            appendLog("────────────────────────────────────────")
+        } catch (Exception e) {
+            appendLog("Error reading file: ${e.message}")
         }
     }
 
     /**
-     * Process user input with AI.
+     * Process user input with AI, including file context from mentions.
      */
-    private void processInput(String userInput) {
+    private void processInput(String userInput, List<String> mentions = []) {
         List<Message> messages = []
-        messages << new Message('user', userInput)
+        
+        // Build context with mentioned files
+        StringBuilder contextBuilder = new StringBuilder()
+        
+        if (mentions && !mentions.isEmpty()) {
+            contextBuilder.append("# Referenced Files\n\n")
+            mentions.each { mention ->
+                def parsed = FileProvider.extractLineRange(mention)
+                String path = parsed.baseQuery
+                Integer startLine = parsed.startLine
+                Integer endLine = parsed.endLine
+                
+                File file = new File(path)
+                if (!file.isAbsolute()) {
+                    file = new File(currentCwd, path)
+                }
+                
+                if (file.exists() && file.isFile()) {
+                    try {
+                        List<String> lines = file.readLines()
+                        int start = startLine ? Math.max(1, startLine) : 1
+                        int end = endLine ? Math.min(lines.size(), endLine) : lines.size()
+                        
+                        contextBuilder.append("## ${file.name}")
+                        if (startLine) {
+                            contextBuilder.append(" (lines ${start}-${end})")
+                        }
+                        contextBuilder.append("\n```${getFileExtension(file.name)}\n")
+                        
+                        for (int i = start - 1; i < end && i < lines.size(); i++) {
+                            contextBuilder.append(lines[i]).append('\n')
+                        }
+                        contextBuilder.append("```\n\n")
+                    } catch (Exception e) {
+                        contextBuilder.append("## ${file.name}\nError reading file: ${e.message}\n\n")
+                    }
+                } else {
+                    contextBuilder.append("## ${mention}\nFile not found\n\n")
+                }
+            }
+            contextBuilder.append("---\n\n")
+        }
+        
+        String fullInput = contextBuilder.length() > 0 
+            ? contextBuilder.toString() + "# User Request\n" + userInput
+            : userInput
+            
+        messages << new Message('user', fullInput)
 
         int maxIterations = 10
         int iteration = 0
@@ -508,6 +710,39 @@ class JexerTUI extends TApplication {
     private static String truncate(String s, int maxLen) {
         if (!s || s.length() <= maxLen) return s ?: ''
         return s.substring(0, maxLen - 3) + '...'
+    }
+
+    /**
+     * Get file extension for syntax highlighting.
+     */
+    private static String getFileExtension(String filename) {
+        int dot = filename.lastIndexOf('.')
+        if (dot < 0) return ''
+        
+        String ext = filename.substring(dot + 1).toLowerCase()
+        switch (ext) {
+            case 'groovy': return 'groovy'
+            case 'java': return 'java'
+            case 'kt': return 'kotlin'
+            case 'js': return 'javascript'
+            case 'ts': return 'typescript'
+            case 'jsx': case 'tsx': return 'tsx'
+            case 'py': return 'python'
+            case 'rb': return 'ruby'
+            case 'go': return 'go'
+            case 'rs': return 'rust'
+            case 'c': case 'h': return 'c'
+            case 'cpp': case 'hpp': return 'cpp'
+            case 'json': return 'json'
+            case 'yaml': case 'yml': return 'yaml'
+            case 'xml': return 'xml'
+            case 'md': return 'markdown'
+            case 'sh': case 'bash': return 'bash'
+            case 'html': return 'html'
+            case 'css': return 'css'
+            case 'sql': return 'sql'
+            default: return ext
+        }
     }
 
 }
