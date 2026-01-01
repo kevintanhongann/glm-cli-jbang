@@ -2,15 +2,39 @@ package commands
 
 import picocli.CommandLine
 import picocli.CommandLine.Command
+import picocli.CommandLine.Option
+import tui.JexerTUI
 
-@Command(name = "glm", mixinStandardHelpOptions = true, version = "glm-cli 0.1",
+@Command(name = "glm", mixinStandardHelpOptions = true, version = "glm-cli 1.0.0",
         description = "GLM-4 based AI coding agent",
         subcommands = [ChatCommand.class, AgentCommand.class, AuthCommand.class])
 class GlmCli implements Runnable {
 
+    @Option(names = ["--simple"], description = "Use simple console mode (no TUI)")
+    boolean simpleMode = false
+
+    @Option(names = ["-m", "--model"], description = "Model to use (default: glm-4.7)")
+    String model = "glm-4.7"
+
     @Override
     void run() {
-        // Default behavior if no subcommand is specified
-        CommandLine.usage(this, System.out)
+        // If no subcommand is specified, launch the TUI
+        if (simpleMode) {
+            // Simple console mode - just show help
+            CommandLine.usage(this, System.out)
+        } else {
+            // Launch the Jexer TUI
+            try {
+                JexerTUI tui = new JexerTUI()
+                tui.start(model, System.getProperty("user.dir"))
+            } catch (Exception e) {
+                // Fallback to simple mode if TUI fails
+                System.err.println("TUI failed to start: ${e.message}")
+                System.err.println("Use --simple flag for console mode, or use 'glm chat' for basic chat.")
+                CommandLine.usage(this, System.out)
+            }
+        }
     }
 }
+
+

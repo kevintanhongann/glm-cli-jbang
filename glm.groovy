@@ -1,5 +1,6 @@
 ///usr/bin/env jbang "$0" "$@" ; exit $?
 //DEPS dev.langchain4j:langchain4j:1.10.0
+//DEPS ./jexer-2.0.0-full.jar
 //DEPS info.picocli:picocli:4.7.7
 //DEPS info.picocli:picocli-groovy:4.7.7   
 //DEPS dev.langchain4j:langchain4j-zhipu-ai:0.36.2
@@ -17,7 +18,7 @@
 //DEPS dev.langchain4j:langchain4j-easy-rag:1.0.0-beta2
 //DEPS dev.langchain4j:langchain4j-embeddings-bge-small-en-v15-q:1.0.0-beta2
 
-// TUI Dependencies  
+// TUI Dependencies
 //DEPS org.fusesource.jansi:jansi:2.4.1
 
 // Core sources
@@ -29,8 +30,13 @@
 //SOURCES commands/AuthCommand.groovy
 //SOURCES models/WebSearchResponse.groovy
 //SOURCES core/WebSearchClient.groovy
+//SOURCES core/GlmClient.groovy
+//SOURCES core/Config.groovy
 //SOURCES tools/WebSearchTool.groovy
 //SOURCES models/Auth.groovy
+//SOURCES models/ChatRequest.groovy
+//SOURCES models/ChatResponse.groovy
+//SOURCES models/Message.groovy
 //SOURCES core/Auth.groovy
 
 // RAG sources
@@ -38,14 +44,26 @@
 //SOURCES rag/CodeChunker.groovy
 //SOURCES rag/EmbeddingService.groovy
 //SOURCES rag/RAGPipeline.groovy
+
+// Tool sources
+//SOURCES tools/Tool.groovy
+//SOURCES tools/ReadFileTool.groovy
+//SOURCES tools/WriteFileTool.groovy
+//SOURCES tools/ListFilesTool.groovy
+//SOURCES tools/FetchUrlTool.groovy
+//SOURCES tools/WebSearchTool.groovy
 //SOURCES tools/CodeSearchTool.groovy
 
-// TUI sources
+// Agent source
+//SOURCES core/Agent.groovy
+
+// TUI sources (Jexer based)
 //SOURCES tui/AnsiColors.groovy
 //SOURCES tui/DiffRenderer.groovy
 //SOURCES tui/InteractivePrompt.groovy
 //SOURCES tui/ProgressIndicator.groovy
 //SOURCES tui/OutputFormatter.groovy
+//SOURCES tui/JexerTUI.groovy
 
 // LSP sources
 //SOURCES models/Diagnostic.groovy
