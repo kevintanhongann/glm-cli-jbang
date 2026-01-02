@@ -28,7 +28,7 @@ class LanternaTUI {
     private ActivityLogPanel activityLogPanel
     private CommandInputPanel commandInputPanel
     private Panel statusBar
-    
+
     private String currentModel
     private String currentCwd
     private String apiKey
@@ -36,15 +36,15 @@ class LanternaTUI {
     private GlmClient client
     private ObjectMapper mapper = new ObjectMapper()
     private List<Map> tools = []
-    
+
     LanternaTUI() throws Exception {
         this.currentCwd = System.getProperty('user.dir')
     }
-    
+
     void start(String model = 'glm-4.7', String cwd = null) {
         this.currentModel = model
         this.currentCwd = cwd ?: System.getProperty('user.dir')
-        
+
         if (!initClient()) {
             System.err.println('Failed to initialize client')
             return
@@ -149,11 +149,11 @@ class LanternaTUI {
         panel.setLayoutManager(new LinearLayout(Direction.HORIZONTAL))
 
         panel.addComponent(new Label("Model: ${currentModel}"))
-        panel.addComponent(new Label("  |  "))
+        panel.addComponent(new Label('  |  '))
         panel.addComponent(new Label("Dir: ${Paths.get(currentCwd).fileName}"))
-        panel.addComponent(new Label("  |  "))
-        panel.addComponent(new Label("Ctrl+C: Exit"))
-        
+        panel.addComponent(new Label('  |  '))
+        panel.addComponent(new Label('Ctrl+C: Exit'))
+
         return panel
     }
 
