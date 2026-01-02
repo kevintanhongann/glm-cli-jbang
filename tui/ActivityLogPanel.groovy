@@ -7,6 +7,7 @@ import com.googlecode.lanterna.input.MouseAction
 import com.googlecode.lanterna.input.MouseActionType
 import com.googlecode.lanterna.TerminalSize
 import com.googlecode.lanterna.TerminalPosition
+import com.googlecode.lanterna.TerminalTextUtils
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.nio.file.Files
@@ -156,6 +157,15 @@ class ActivityLogPanel {
         }
     }
 
+    private String wrapText(String text, int maxWidth) {
+        if (maxWidth <= 0) {
+            return text
+        }
+        def lines = text.split('\n')
+        def wrapped = TerminalTextUtils.getWordWrappedText(maxWidth, *lines)
+        return wrapped.join('\n')
+    }
+
     /**
      * Set callback for scroll position changes
      * Callback receives (currentLine, totalLines)
@@ -211,14 +221,18 @@ class ActivityLogPanel {
         if (textGUI != null && textGUI.getGUIThread() != null) {
             textGUI.getGUIThread().invokeLater(() -> {
                 synchronized (content) {
-                    textBox.setText(content.toString())
+                    int maxWidth = textBox.getSize().getColumns()
+                    String wrappedContent = wrapText(content.toString(), maxWidth)
+                    textBox.setText(wrappedContent)
                     textBox.scrollToBottom()
                     textBox.invalidate()
                 }
             })
         } else {
             synchronized (content) {
-                textBox.setText(content.toString())
+                int maxWidth = textBox.getSize().getColumns()
+                String wrappedContent = wrapText(content.toString(), maxWidth)
+                textBox.setText(wrappedContent)
                 textBox.scrollToBottom()
                 textBox.invalidate()
             }
