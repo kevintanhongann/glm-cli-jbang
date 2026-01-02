@@ -5,6 +5,7 @@ import com.googlecode.lanterna.gui2.*
 import com.googlecode.lanterna.screen.Screen
 import com.googlecode.lanterna.screen.TerminalScreen
 import com.googlecode.lanterna.terminal.DefaultTerminalFactory
+import com.googlecode.lanterna.terminal.MouseCaptureMode
 import core.Auth
 import core.GlmClient
 import core.Config
@@ -16,6 +17,8 @@ import tools.WriteFileTool
 import tools.ListFilesTool
 import tools.WebSearchTool
 import tools.CodeSearchTool
+import tools.GrepTool
+import tools.GlobTool
 import rag.RAGPipeline
 import com.fasterxml.jackson.databind.ObjectMapper
 import java.nio.file.Paths
@@ -28,6 +31,7 @@ class LanternaTUI {
     private ActivityLogPanel activityLogPanel
     private CommandInputPanel commandInputPanel
     private Panel statusBar
+    private Label scrollPositionLabel
 
     private String currentModel
     private String currentCwd
@@ -51,7 +55,9 @@ class LanternaTUI {
         }
 
         try {
-            screen = new DefaultTerminalFactory().createScreen()
+            screen = new DefaultTerminalFactory()
+                .setMouseCaptureMode(MouseCaptureMode.CLICK_RELEASE_DRAG)
+                .createScreen()
             screen.startScreen()
 
             textGUI = new MultiWindowTextGUI(screen)
@@ -93,6 +99,8 @@ class LanternaTUI {
         tools << new ReadFileTool()
         tools << new WriteFileTool()
         tools << new ListFilesTool()
+        tools << new GrepTool()
+        tools << new GlobTool()
 
         if (config?.webSearch?.enabled) {
             tools << new WebSearchTool(apiKey)
@@ -121,21 +129,30 @@ class LanternaTUI {
         activityLogPanel = new ActivityLogPanel(textGUI)
         activityLogPanel.appendWelcomeMessage(currentModel)
 
+        // Wire up scroll position updates to status bar
+        activityLogPanel.setOnScrollPositionChanged { int currentLine, int totalLines ->
+            updateScrollPosition(currentLine, totalLines)
+        }
+
         def activityLogComponent = activityLogPanel.getTextBox().withBorder(Borders.singleLine('Activity Log'))
         activityLogComponent.setLayoutData(
-            LinearLayout.createLayoutData(LinearLayout.Alignment.Fill)
+            LinearLayout.createLayoutData(LinearLayout.Alignment.Fill, LinearLayout.GrowPolicy.CanGrow)
         )
         mainPanel.addComponent(activityLogComponent)
 
         commandInputPanel = new CommandInputPanel(textGUI, this)
         def commandInputComponent = commandInputPanel.getTextBox().withBorder(Borders.singleLine('Command'))
         commandInputComponent.setLayoutData(
-            LinearLayout.createLayoutData(LinearLayout.Alignment.Fill)
+            LinearLayout.createLayoutData(LinearLayout.Alignment.Fill, LinearLayout.GrowPolicy.None)
         )
         mainPanel.addComponent(commandInputComponent)
 
         statusBar = createStatusBar()
-        mainPanel.addComponent(statusBar.withBorder(Borders.singleLine()))
+        def statusBarComponent = statusBar.withBorder(Borders.singleLine())
+        statusBarComponent.setLayoutData(
+            LinearLayout.createLayoutData(LinearLayout.Alignment.Fill, LinearLayout.GrowPolicy.None)
+        )
+        mainPanel.addComponent(statusBarComponent)
 
         mainWindow.setComponent(mainPanel)
         textGUI.addWindow(mainWindow)
@@ -152,9 +169,27 @@ class LanternaTUI {
         panel.addComponent(new Label('  |  '))
         panel.addComponent(new Label("Dir: ${Paths.get(currentCwd).fileName}"))
         panel.addComponent(new Label('  |  '))
+
+        // Dynamic scroll position label
+        scrollPositionLabel = new Label('')
+        panel.addComponent(scrollPositionLabel)
+
+        panel.addComponent(new Label('  |  '))
+        panel.addComponent(new Label('Ctrl+S: Save Log'))
+        panel.addComponent(new Label('  |  '))
         panel.addComponent(new Label('Ctrl+C: Exit'))
 
         return panel
+    }
+
+    private void updateScrollPosition(int currentLine, int totalLines) {
+        if (scrollPositionLabel != null) {
+            if (currentLine < totalLines - 5) {
+                scrollPositionLabel.setText("Line ${currentLine}/${totalLines}")
+            } else {
+                scrollPositionLabel.setText('')
+            }
+        }
     }
 
     void processUserInput(String input) {
@@ -271,6 +306,10 @@ class LanternaTUI {
                 return "Search \"${truncate(args.query?.toString(), 30)}\""
             case 'code_search':
                 return "CodeSearch \"${truncate(args.query?.toString(), 30)}\""
+            case 'grep':
+                return "Grep \"${truncate(args.pattern?.toString(), 30)}\""
+            case 'glob':
+                return "Glob \"${truncate(args.pattern?.toString(), 30)}\""
             default:
                 return "${name}(${truncate(args.toString(), 40)})"
         }

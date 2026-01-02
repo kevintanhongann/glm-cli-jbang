@@ -33,6 +33,8 @@
 //SOURCES core/WebSearchClient.groovy
 //SOURCES core/GlmClient.groovy
 //SOURCES core/Config.groovy
+//SOURCES core/RipgrepHelper.groovy
+//SOURCES core/JavaSearchFallback.groovy
 //SOURCES tools/WebSearchTool.groovy
 //SOURCES models/Auth.groovy
 //SOURCES models/ChatRequest.groovy
@@ -54,6 +56,8 @@
 //SOURCES tools/FetchUrlTool.groovy
 //SOURCES tools/WebSearchTool.groovy
 //SOURCES tools/CodeSearchTool.groovy
+//SOURCES tools/GrepTool.groovy
+//SOURCES tools/GlobTool.groovy
 
 // Agent source
 //SOURCES core/Agent.groovy

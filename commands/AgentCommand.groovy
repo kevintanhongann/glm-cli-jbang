@@ -11,6 +11,8 @@ import tools.WriteFileTool
 import tools.ListFilesTool
 import tools.WebSearchTool
 import tools.CodeSearchTool
+import tools.GrepTool
+import tools.GlobTool
 import rag.RAGPipeline
 
 @Command(name = "agent", description = "Run an autonomous agent task", mixinStandardHelpOptions = true)
@@ -50,6 +52,8 @@ class AgentCommand implements Runnable {
         agent.registerTool(new ReadFileTool())
         agent.registerTool(new WriteFileTool())
         agent.registerTool(new ListFilesTool())
+        agent.registerTool(new GrepTool())
+        agent.registerTool(new GlobTool())
         
         if (config.webSearch.enabled) {
             agent.registerTool(new WebSearchTool(apiKey))
