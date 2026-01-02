@@ -81,7 +81,7 @@ base_url = "https://open.bigmodel.cn/api/paas/v4/"
 | `default_model` | string | `"glm-4-flash"` | Default GLM-4 model to use |
 | `safety_mode` | string | `"ask"` | Safety mode for file operations |
 | `language` | string | `"auto"` | Language preference |
-| `max_steps` | integer | `null` (unlimited) | Maximum agent reasoning steps |
+| `max_steps` | integer | `null` (unlimited) | Maximum agent iterations before tools are disabled |
 
 #### Models
 
@@ -105,6 +105,18 @@ Available values for `language`:
 - `auto` - Detect from content (default)
 - `en` - English
 - `zh` - Chinese
+
+#### Max Steps
+
+Controls the maximum number of agent iterations. When the limit is reached:
+- Tools are disabled for the final response
+- Agent is prompted to summarize work and provide recommendations
+- Default is `null` (unlimited iterations)
+
+Recommended values:
+- `5-10` - Quick tasks, limited tool usage
+- `20-30` - Complex multi-step tasks
+- `null` - Unlimited (default, be aware of potential infinite loops)
 
 #### Example
 
@@ -191,6 +203,29 @@ system_prompt = "You are a helpful Groovy expert."
 stream = true
 ```
 
+### [experimental] - Experimental Features Configuration
+
+| Key | Type | Default | Description |
+|------|------|---------|-------------|
+| `continue_loop_on_deny` | boolean | `false` | Continue agent loop even when permission is denied (e.g., doom loop) |
+
+#### Doom Loop Behavior
+
+When `continue_loop_on_deny` is set to `false` (default):
+- Agent stops execution when a doom loop is detected and user denies permission
+- Useful for preventing infinite loops from running
+
+When `continue_loop_on_deny` is set to `true`:
+- Agent continues execution even when permission is denied
+- May be useful for certain use cases but increases risk of infinite loops
+
+#### Example
+
+```toml
+[experimental]
+continue_loop_on_deny = false
+```
+
 ### [web_search] - Web Search Configuration
 
 | Key | Type | Default | Description |
@@ -238,6 +273,7 @@ Environment variables override config file settings:
 | `GLM_WEB_SEARCH_ENABLED` | `web_search.enabled` | Enable web search (true/false) |
 | `GLM_WEB_SEARCH_COUNT` | `web_search.default_count` | Default result count (1-50) |
 | `GLM_WEB_SEARCH_RECENCY` | `web_search.default_recency_filter` | Default time filter |
+| `GLM_CONTINUE_LOOP_ON_DENY` | `experimental.continue_loop_on_deny` | Continue loop on permission deny (true/false) |
 
 ### Setting Environment Variables
 

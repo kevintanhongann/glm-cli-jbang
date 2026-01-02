@@ -11,6 +11,8 @@ A native-performance AI coding agent CLI for Linux, macOS, and Windows, powered 
 
 <img width="1910" height="941" alt="image" src="https://github.com/user-attachments/assets/af623ad0-f541-40ce-b040-c714c4ba7b9a" />
 
+⚠️ Under Active Development - glm-cli-jbang is actively developed. If you ⭐ star and 👀 watch this repository, it would mean a lot to me.
+
 ## Features
 
 | Feature | Description |

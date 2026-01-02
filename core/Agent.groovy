@@ -15,16 +15,36 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 
+class ToolCallHistory {
+    String toolName
+    String arguments
+    Date timestamp
+
+    ToolCallHistory(String toolName, String arguments) {
+        this.toolName = toolName
+        this.arguments = arguments
+        this.timestamp = new Date()
+    }
+
+    boolean equals(ToolCallHistory other) {
+        return this.toolName == other.toolName && this.arguments == other.arguments
+    }
+}
+
 class Agent {
     private final GlmClient client
     private final List<Tool> tools = []
     private final List<Message> history = []
     private final ObjectMapper mapper = new ObjectMapper()
-    private String model = "glm-4-flash"
+    private String model = "glm-4.7"
+    private int step = 0
+    private final Config config
+    private final List<ToolCallHistory> toolCallHistory = []
 
     Agent(String apiKey, String model) {
         this.client = new GlmClient(apiKey)
         this.model = model
+        this.config = Config.load()
         AnsiColors.install()
     }
 
@@ -34,6 +54,19 @@ class Agent {
 
     void registerTools(List<Tool> tools) {
         this.tools.addAll(tools)
+    }
+
+    private boolean isDoomLoop(String toolName, String arguments) {
+        def lastThree = toolCallHistory.take(3)
+        if (lastThree.size() < 3) return false
+
+        return lastThree.every { call ->
+            call.toolName == toolName && call.arguments == arguments
+        }
+    }
+
+    private boolean shouldContinueOnDeny() {
+        return config.experimental?.continueLoopOnDeny == true
     }
 
     /**
@@ -46,7 +79,16 @@ class Agent {
         OutputFormatter.printInfo("Task: ${prompt}")
 
         while (true) {
+            step++
+
             ChatRequest request = prepareRequest()
+
+            if (config.behavior.maxSteps != null && step >= config.behavior.maxSteps) {
+                OutputFormatter.printWarning("Maximum steps (${config.behavior.maxSteps}) reached. Disabling tools for final response.")
+                request.tools = []
+                def maxStepsMsg = new Message("assistant", "You have reached the maximum number of allowed steps. Please provide a summary of the work completed and any remaining tasks or recommendations. Do not make any tool calls.")
+                request.messages.add(maxStepsMsg)
+            }
             
             ProgressIndicator spinner = new ProgressIndicator()
             spinner.start("Thinking...")
@@ -74,8 +116,33 @@ class Agent {
                     String functionName = toolCall.function.name
                     String arguments = toolCall.function.arguments
                     String callId = toolCall.id
-                    
+
                     OutputFormatter.printInfo("Executing tool: ${AnsiColors.bold(functionName)}")
+
+                    if (isDoomLoop(functionName, arguments)) {
+                        OutputFormatter.printError("Doom loop detected! The same tool '${functionName}' has been called 3 times with identical arguments.")
+
+                        boolean allowExecution = false
+                        if (InteractivePrompt.confirm("Allow execution anyway? (otherwise loop will stop)")) {
+                            allowExecution = true
+                        }
+
+                        if (!allowExecution) {
+                            Message toolMsg = new Message()
+                            toolMsg.role = "tool"
+                            toolMsg.content = "Execution stopped: Doom loop detected. The same tool '${functionName}' was called 3 times with identical arguments. Please try a different approach or modify your approach."
+                            toolMsg.toolCallId = callId
+                            history.add(toolMsg)
+
+                            if (shouldContinueOnDeny()) {
+                                OutputFormatter.printInfo("Continuing loop despite doom loop...")
+                                return
+                            } else {
+                                OutputFormatter.printWarning("Stopping agent due to doom loop.")
+                                return
+                            }
+                        }
+                    }
                     
                     // Safety & Diff Check for write_file
                     if (functionName == "write_file") {
@@ -115,16 +182,21 @@ class Agent {
                             Map<String, Object> args = mapper.readValue(arguments, Map.class)
                             Object output = tool.execute(args)
                             result = output.toString()
+
+                            toolCallHistory.add(0, new ToolCallHistory(functionName, arguments))
+                            if (toolCallHistory.size() > 10) {
+                                toolCallHistory.remove(toolCallHistory.size() - 1)
+                            }
                         } catch (Exception e) {
                             result = "Error executing tool: ${e.message}"
                         }
                     } else {
                         result = "Error: Tool not found."
                     }
-                    
+
                     OutputFormatter.printSection("Tool Output")
                     println result
-                    
+
                     Message toolMsg = new Message()
                     toolMsg.role = "tool"
                     toolMsg.content = result

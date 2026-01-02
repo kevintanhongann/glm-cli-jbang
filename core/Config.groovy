@@ -24,6 +24,9 @@ class Config {
     @JsonProperty("tui")
     TuiConfig tui = new TuiConfig()
 
+    @JsonProperty("experimental")
+    ExperimentalConfig experimental = new ExperimentalConfig()
+
     static class ApiConfig {
         String key
         @JsonProperty("base_url")
@@ -36,6 +39,8 @@ class Config {
         String safetyMode = "ask" // ask, always_allow
         @JsonProperty("default_model")
         String defaultModel = "glm-4-flash"
+        @JsonProperty("max_steps")
+        Integer maxSteps = null  // null = unlimited
     }
 
     static class WebSearchConfig {
@@ -61,6 +66,11 @@ class Config {
         Boolean colorsEnabled = true
         @JsonProperty("diff_context_lines")
         Integer diffContextLines = 3
+    }
+
+    static class ExperimentalConfig {
+        @JsonProperty("continue_loop_on_deny")
+        Boolean continueLoopOnDeny = false  // If true, continues loop on permission deny; if false, stops loop
     }
 
     static Config load() {

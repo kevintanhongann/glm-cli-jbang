@@ -87,8 +87,10 @@ class ScrollableTextBox extends TextBox {
 
     void scrollToBottom() {
         int lineCount = getLineCount()
+        int visibleRows = getSize().getRows()
         if (lineCount > 0) {
-            setCaretPosition(0, lineCount - 1)
+            int targetRow = Math.max(0, lineCount - visibleRows)
+            getRenderer().setViewTopLeft(com.googlecode.lanterna.TerminalPosition.TOP_LEFT_CORNER.withRow(targetRow))
         }
     }
 
@@ -206,19 +208,19 @@ class ActivityLogPanel {
     }
 
     void updateDisplay() {
-        synchronized (content) {
-            textBox.setText(content.toString())
-
-            // Always scroll to bottom when content is updated
-            textBox.scrollToBottom()
-        }
-
         if (textGUI != null && textGUI.getGUIThread() != null) {
-            try {
-                textGUI.getGUIThread().invokeLater(() -> {
+            textGUI.getGUIThread().invokeLater(() -> {
+                synchronized (content) {
+                    textBox.setText(content.toString())
+                    textBox.scrollToBottom()
                     textBox.invalidate()
-                })
-            } catch (Exception e) {
+                }
+            })
+        } else {
+            synchronized (content) {
+                textBox.setText(content.toString())
+                textBox.scrollToBottom()
+                textBox.invalidate()
             }
         }
     }
