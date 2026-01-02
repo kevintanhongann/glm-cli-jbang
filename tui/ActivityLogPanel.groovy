@@ -13,21 +13,16 @@ import java.nio.file.Files
 import java.nio.file.Paths as NioPaths
 
 /**
- * Custom TextBox that supports Page Up/Down, Arrow keys, and mouse wheel scrolling.
- * Uses a "view-only" mode that allows navigation but blocks text editing.
+ * Custom TextBox that extends standard TextBox with scroll callbacks and save support.
+ * Uses standard setReadOnly() to control text editing while allowing navigation.
  */
 class ScrollableTextBox extends TextBox {
 
-    private boolean viewOnly = false
     private Closure onScrollCallback = null
     private Closure onSaveCallback = null
 
     ScrollableTextBox(TerminalSize preferredSize, String initialContent, Style style) {
         super(preferredSize, initialContent, style)
-    }
-
-    void setViewOnly(boolean viewOnly) {
-        this.viewOnly = viewOnly
     }
 
     void setOnScrollCallback(Closure callback) {
@@ -48,22 +43,6 @@ class ScrollableTextBox extends TextBox {
     synchronized Result handleKeyStroke(KeyStroke keyStroke) {
         KeyType keyType = keyStroke.getKeyType()
 
-        // Handle mouse scroll events
-        if (keyType == KeyType.MouseEvent) {
-            MouseAction mouseAction = (MouseAction) keyStroke
-            MouseActionType actionType = mouseAction.getActionType()
-
-            if (actionType == MouseActionType.SCROLL_UP) {
-                scrollUp(3)
-                notifyScroll()
-                return Result.HANDLED
-            } else if (actionType == MouseActionType.SCROLL_DOWN) {
-                scrollDown(3)
-                notifyScroll()
-                return Result.HANDLED
-            }
-        }
-
         // Handle Ctrl+S for save
         if (keyType == KeyType.Character && keyStroke.isCtrlDown()) {
             char c = keyStroke.getCharacter()
@@ -75,71 +54,35 @@ class ScrollableTextBox extends TextBox {
             }
         }
 
+        // Track scroll position changes for navigation keys
         switch (keyType) {
-            case KeyType.PageUp:
-                scrollUp(getSize().getRows() - 1)
-                notifyScroll()
-                return Result.HANDLED
-            case KeyType.PageDown:
-                scrollDown(getSize().getRows() - 1)
-                notifyScroll()
-                return Result.HANDLED
             case KeyType.Home:
                 if (keyStroke.isCtrlDown()) {
-                    setCaretPosition(0, 0)
                     notifyScroll()
-                    return Result.HANDLED
                 }
                 break
             case KeyType.End:
                 if (keyStroke.isCtrlDown()) {
-                    scrollToBottom()
                     notifyScroll()
-                    return Result.HANDLED
                 }
                 break
+            case KeyType.PageUp:
+            case KeyType.PageDown:
             case KeyType.ArrowUp:
-                scrollUp(1)
-                notifyScroll()
-                return Result.HANDLED
             case KeyType.ArrowDown:
-                scrollDown(1)
                 notifyScroll()
-                return Result.HANDLED
-            case KeyType.ArrowLeft:
-            case KeyType.ArrowRight:
-                // Allow horizontal navigation
-                return super.handleKeyStroke(keyStroke)
-            case KeyType.Character:
-            case KeyType.Backspace:
-            case KeyType.Delete:
-            case KeyType.Enter:
-                // Block text editing when in view-only mode
-                if (viewOnly) {
-                    return Result.HANDLED
-                }
                 break
         }
 
-        // For Tab, allow focus change
-        if (keyType == KeyType.Tab || keyType == KeyType.ReverseTab) {
-            return Result.MOVE_FOCUS_NEXT
+        // Let parent TextBox handle all other key strokes including mouse events
+        Result result = super.handleKeyStroke(keyStroke)
+
+        // Also notify after mouse events
+        if (keyType == KeyType.MouseEvent) {
+            notifyScroll()
         }
 
-        return super.handleKeyStroke(keyStroke)
-    }
-
-    void scrollUp(int lines) {
-        TerminalPosition pos = getCaretPosition()
-        int newRow = Math.max(0, pos.getRow() - lines)
-        setCaretPosition(0, newRow)
-    }
-
-    void scrollDown(int lines) {
-        TerminalPosition pos = getCaretPosition()
-        int lineCount = getLineCount()
-        int newRow = Math.min(Math.max(0, lineCount - 1), pos.getRow() + lines)
-        setCaretPosition(0, newRow)
+        return result
     }
 
     void scrollToBottom() {
@@ -149,21 +92,14 @@ class ScrollableTextBox extends TextBox {
         }
     }
 
-    boolean isAtBottom() {
-        int lineCount = getLineCount()
-        if (lineCount == 0) return true
-        TerminalPosition pos = getCaretPosition()
-        int visibleRows = getSize().getRows()
-        return pos.getRow() >= lineCount - visibleRows
-    }
-
     /**
      * Get current scroll position info [currentLine, totalLines]
      */
     int[] getScrollPosition() {
         int lineCount = getLineCount()
-        TerminalPosition pos = getCaretPosition()
-        return [pos.getRow() + 1, lineCount] as int[]
+        TerminalPosition viewTopLeft = getRenderer().getViewTopLeft()
+        int currentLine = viewTopLeft.getRow() + 1
+        return [currentLine, lineCount] as int[]
     }
 
 }
@@ -174,7 +110,6 @@ class ActivityLogPanel {
     private StringBuilder content = new StringBuilder()
     private MultiWindowTextGUI textGUI
     private String statusLine = null
-    private boolean autoScrollEnabled = true
     private boolean timestampsEnabled = true
     private Closure onScrollPositionChanged = null
 
@@ -188,13 +123,12 @@ class ActivityLogPanel {
             '',
             TextBox.Style.MULTI_LINE
         )
-        // Use view-only mode instead of read-only to allow keyboard navigation
-        textBox.setViewOnly(true)
+        // Use read-only mode to allow navigation but block text editing
+        textBox.setReadOnly(true)
         textBox.setCaretWarp(true)
 
-        // Track when user manually scrolls - disable auto-scroll if they scroll up
+        // Track scroll position for status bar display
         textBox.setOnScrollCallback {
-            autoScrollEnabled = textBox.isAtBottom()
             notifyScrollPositionChanged()
         }
 
@@ -275,10 +209,8 @@ class ActivityLogPanel {
         synchronized (content) {
             textBox.setText(content.toString())
 
-            // Only auto-scroll if the user hasn't manually scrolled up
-            if (autoScrollEnabled) {
-                textBox.scrollToBottom()
-            }
+            // Always scroll to bottom when content is updated
+            textBox.scrollToBottom()
         }
 
         if (textGUI != null && textGUI.getGUIThread() != null) {
