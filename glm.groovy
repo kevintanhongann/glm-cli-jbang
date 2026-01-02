@@ -80,6 +80,7 @@
 //SOURCES tui/LanternaTheme.groovy
 //SOURCES tui/ActivityLogPanel.groovy
 //SOURCES tui/CommandInputPanel.groovy
+//SOURCES tui/LanternaAutocompletePopup.groovy
 
 // LSP sources
 //SOURCES models/Diagnostic.groovy

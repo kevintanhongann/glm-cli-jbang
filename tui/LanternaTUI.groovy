@@ -140,7 +140,7 @@ class LanternaTUI {
         )
         mainPanel.addComponent(activityLogComponent)
 
-        commandInputPanel = new CommandInputPanel(textGUI, this)
+        commandInputPanel = new CommandInputPanel(textGUI, this, currentCwd)
         def commandInputComponent = commandInputPanel.getTextBox().withBorder(Borders.singleLine('Command'))
         commandInputComponent.setLayoutData(
             LinearLayout.createLayoutData(LinearLayout.Alignment.Fill, LinearLayout.GrowPolicy.None)
@@ -192,15 +192,15 @@ class LanternaTUI {
         }
     }
 
-    void processUserInput(String input) {
+    void processUserInput(String input, List<String> mentions = []) {
         activityLogPanel.appendUserMessage(input)
 
         Thread.start {
-            processInput(input)
+            processInput(input, mentions)
         }
     }
 
-    private void processInput(String userInput) {
+    private void processInput(String userInput, List<String> mentions = []) {
         List<Message> messages = []
 
         messages << new Message('user', userInput)
