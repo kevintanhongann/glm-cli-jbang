@@ -9,6 +9,8 @@ A native-performance AI coding agent CLI for Linux, macOS, and Windows, powered 
 
 ![Demo](https://img.shields.io/badge/demo-available-lightgrey?style=flat-square)
 
+<img width="1910" height="941" alt="image" src="https://github.com/user-attachments/assets/af623ad0-f541-40ce-b040-c714c4ba7b9a" />
+
 ## Features
 
 | Feature | Description |
