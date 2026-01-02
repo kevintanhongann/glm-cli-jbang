@@ -12,6 +12,7 @@ import core.Config
 import core.AgentType
 import core.AgentConfig
 import core.AgentRegistry
+import core.Instructions
 import models.ChatRequest
 import models.ChatResponse
 import models.Message
@@ -239,13 +240,19 @@ class LanternaTUI {
     private void processInput(String userInput, List<String> mentions = []) {
         List<Message> messages = []
 
+        // Load AGENTS.md instructions
+        def customInstructions = Instructions.loadAll(currentCwd)
+        customInstructions.each { instruction ->
+            messages << new Message('system', instruction)
+        }
+
         // Get agent config for current type
         AgentConfig agentConfig = agentRegistry.getCurrentAgentConfig()
 
-        // Load system prompt if available
-        def systemPrompt = agentConfig.loadPrompt()
-        if (systemPrompt && !systemPrompt.isEmpty()) {
-            messages << new Message('system', systemPrompt)
+        // Load agent-specific system prompt
+        def promptFile = new File("prompts/${agentConfig.type.name().toLowerCase()}.txt")
+        if (promptFile.exists()) {
+            messages << new Message('system', promptFile.text)
         }
 
         messages << new Message('user', userInput)

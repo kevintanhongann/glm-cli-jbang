@@ -65,6 +65,13 @@ class ChatCommand implements Runnable {
     }
 
     private void processInput(String input) {
+        if (history.isEmpty()) {
+            def customInstructions = Instructions.loadAll()
+            customInstructions.each { instruction ->
+                history.add(new Message("system", instruction))
+            }
+        }
+
         history.add(new Message("user", input))
         
         ChatRequest request = new ChatRequest()

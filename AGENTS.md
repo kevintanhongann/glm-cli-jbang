@@ -510,3 +510,57 @@ Consider supporting external tools via:
 - [ReAct Paper](https://arxiv.org/abs/2210.03629) - Reasoning and Acting in Language Models
 - [SST OpenCode AGENTS.md](https://github.com/sst/opencode/blob/dev/AGENTS.md) - Inspiration for this document
 - [GLM-4 API Documentation](https://open.bigmodel.cn/dev/api) - Tool calling specification
+
+## AGENTS.md Detection
+
+The GLM-CLI automatically detects and loads AGENTS.md files from multiple locations:
+
+### Search Order
+
+1. **Local AGENTS.md** - Searches upward from current directory to project root
+2. **Global AGENTS.md** - Checks `~/.glm/AGENTS.md`
+3. **Custom instructions** - Loads files specified in `config.toml`
+
+### Configuration
+
+Add custom instruction files to `~/.glm/config.toml`:
+
+```toml
+[instructions]
+# Additional instruction files or patterns to include
+instructions = [
+    "docs/*.md",           # Glob pattern
+    "~/custom-rules.md",   # Home directory file
+    "packages/*/AGENTS.md" # Multi-package project
+]
+```
+
+### Project Roots
+
+Search stops at:
+- `.git` directory (if in git repo)
+- `package-lock.json`, `yarn.lock`, `bun.lock` files
+- Home directory (fallback)
+
+### Compatibility
+
+Also detects:
+- `CLAUDE.md` - For Claude AI compatibility
+- `CONTEXT.md` - Deprecated but still supported
+
+### Automatic Initialization
+
+Use the `glm init` command to automatically generate or update AGENTS.md:
+
+```bash
+# Create AGENTS.md in current directory
+glm init
+
+# Create AGENTS.md in specific directory
+glm init --path /path/to/project
+
+# Improve existing AGENTS.md
+glm init  # Will analyze and improve existing file
+```
+
+The init command analyzes the codebase structure, detects build/test commands, and creates comprehensive guidelines tailored to the project.

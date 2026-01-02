@@ -83,6 +83,14 @@ class Agent {
      * This handles the ReAct loop: Think -> Act -> Observe -> Think
      */
     void run(String prompt) {
+        def customInstructions = Instructions.loadAll()
+
+        if (!customInstructions.isEmpty()) {
+            customInstructions.each { instruction ->
+                history.add(new Message("system", instruction))
+            }
+        }
+
         history.add(new Message("user", prompt))
         OutputFormatter.printHeader("GLM Agent")
         OutputFormatter.printInfo("Task: ${prompt}")

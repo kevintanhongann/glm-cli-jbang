@@ -27,6 +27,9 @@ class Config {
     @JsonProperty("experimental")
     ExperimentalConfig experimental = new ExperimentalConfig()
 
+    @JsonProperty("instructions")
+    List<String> instructions = []
+
     static class ApiConfig {
         String key
         @JsonProperty("base_url")

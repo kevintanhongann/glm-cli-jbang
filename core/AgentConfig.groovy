@@ -39,10 +39,20 @@ class AgentConfig {
 
     String loadPrompt() {
         def promptFile = new File("prompts/${type.name().toLowerCase()}.txt")
+        def basePrompt = ""
+
         if (promptFile.exists()) {
-            return promptFile.text
+            basePrompt = promptFile.text
+        } else {
+            basePrompt = description
         }
-        return description
+
+        def customInstructions = Instructions.loadAll()
+        if (!customInstructions.isEmpty()) {
+            basePrompt += "\n\n" + customInstructions.join("\n\n")
+        }
+
+        return basePrompt
     }
 
     static AgentConfig build() {

@@ -49,6 +49,13 @@ file = "/path/to/agent.log"
 [chat]
 system_prompt = "You are a helpful coding assistant."
 stream = true
+
+[instructions]
+instructions = [
+    "docs/*.md",
+    "~/custom-rules.md",
+    "packages/*/AGENTS.md"
+]
 ```
 
 ## Configuration Sections
@@ -224,6 +231,54 @@ When `continue_loop_on_deny` is set to `true`:
 ```toml
 [experimental]
 continue_loop_on_deny = false
+```
+
+### [instructions] - Custom Instructions Configuration
+
+| Key | Type | Default | Description |
+|------|------|---------|-------------|
+| `instructions` | array of strings | `[]` | Additional instruction files or patterns to include |
+
+#### Instruction Sources
+
+The `instructions` field allows you to add custom instruction files that will be loaded automatically:
+
+- **Glob patterns**: Match multiple files (e.g., `"docs/*.md"`)
+- **Relative paths**: Files relative to current directory
+- **Absolute paths**: Full file paths
+- **Home directory**: Use `~/` prefix
+
+#### Supported Patterns
+
+```toml
+[instructions]
+# Glob pattern to match all markdown files in docs/
+instructions = [
+    "docs/*.md",
+
+    # Absolute path
+    "/path/to/custom/rules.md",
+
+    # Home directory file
+    "~/my-coding-guidelines.md",
+
+    # Multi-package project
+    "packages/*/AGENTS.md",
+
+    # Specific file
+    "STYLE_GUIDE.md"
+]
+```
+
+#### Example
+
+```toml
+[instructions]
+instructions = [
+    "docs/*.md",
+    "~/custom-rules.md",
+    "packages/*/AGENTS.md"
+]
 ```
 
 ### [web_search] - Web Search Configuration

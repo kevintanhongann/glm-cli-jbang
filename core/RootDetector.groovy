@@ -71,4 +71,25 @@ class RootDetector {
         
         return findNearestFile(startDir, markers as String[])
     }
+
+    static String findWorktreeRoot(String startDir) {
+        def gitRoot = findGitRoot(startDir)
+        if (gitRoot) {
+            return gitRoot
+        }
+
+        return System.getProperty("user.home")
+    }
+
+    static String findStopDirectory(String startDir) {
+        def markers = [
+            ".git",
+            ".opencode",
+            "package-lock.json",
+            "yarn.lock",
+            "bun.lock"
+        ]
+
+        return findNearestFile(startDir, markers as String[])
+    }
 }
