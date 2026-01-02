@@ -20,6 +20,7 @@
 
 // TUI Dependencies
 //DEPS org.fusesource.jansi:jansi:2.4.1
+//DEPS com.googlecode.lanterna:lanterna:3.1.2
 
 // Core sources
 // TODO: ZaiCodingPlanClient needs to be updated for new LangChain4j API
@@ -69,6 +70,12 @@
 //SOURCES tui/AutocompletePopup.groovy
 //SOURCES tui/FileProvider.groovy
 //SOURCES tui/CommandProvider.groovy
+
+// TUI sources (Lanterna based)
+//SOURCES tui/LanternaTUI.groovy
+//SOURCES tui/LanternaTheme.groovy
+//SOURCES tui/ActivityLogPanel.groovy
+//SOURCES tui/CommandInputPanel.groovy
 
 // LSP sources
 //SOURCES models/Diagnostic.groovy
