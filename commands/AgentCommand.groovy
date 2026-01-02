@@ -74,6 +74,8 @@ class AgentCommand implements Runnable {
             agent.run(task)
         } catch (Exception e) {
             e.printStackTrace()
+        } finally {
+            agent.shutdown()
         }
     }
 }

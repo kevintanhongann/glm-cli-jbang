@@ -9,6 +9,9 @@ import com.googlecode.lanterna.terminal.MouseCaptureMode
 import core.Auth
 import core.GlmClient
 import core.Config
+import core.AgentType
+import core.AgentConfig
+import core.AgentRegistry
 import models.ChatRequest
 import models.ChatResponse
 import models.Message
@@ -19,6 +22,7 @@ import tools.WebSearchTool
 import tools.CodeSearchTool
 import tools.GrepTool
 import tools.GlobTool
+import tools.Tool
 import rag.RAGPipeline
 import com.fasterxml.jackson.databind.ObjectMapper
 import java.nio.file.Paths
@@ -32,6 +36,7 @@ class LanternaTUI {
     private CommandInputPanel commandInputPanel
     private Panel statusBar
     private Label scrollPositionLabel
+    private Label agentSwitcherLabel
 
     private String currentModel
     private String currentCwd
@@ -40,9 +45,11 @@ class LanternaTUI {
     private GlmClient client
     private ObjectMapper mapper = new ObjectMapper()
     private List<Map> tools = []
+    private AgentRegistry agentRegistry
 
     LanternaTUI() throws Exception {
         this.currentCwd = System.getProperty('user.dir')
+        this.agentRegistry = new AgentRegistry(AgentType.BUILD)
     }
 
     void start(String model = 'glm-4.7', String cwd = null) {
@@ -178,6 +185,15 @@ class LanternaTUI {
         panel.addComponent(new Label('Ctrl+S: Save Log'))
         panel.addComponent(new Label('  |  '))
         panel.addComponent(new Label('Ctrl+C: Exit'))
+        panel.addComponent(new Label('  |  '))
+
+        // Agent switcher indicator
+        agentSwitcherLabel = new Label(agentRegistry.getCurrentAgentName())
+        agentSwitcherLabel.setForegroundColor(LanternaTheme.getAgentBuildColor())
+        panel.addComponent(agentSwitcherLabel)
+
+        // Tab hint
+        panel.addComponent(new Label(' (Tab/Shift+Tab to switch)'))
 
         return panel
     }
@@ -188,6 +204,26 @@ class LanternaTUI {
                 scrollPositionLabel.setText("Line ${currentLine}/${totalLines}")
             } else {
                 scrollPositionLabel.setText('')
+            }
+        }
+    }
+
+    void cycleAgent(int direction = 1) {
+        agentRegistry.cycleAgent(direction)
+        updateAgentSwitcherIndicator()
+        activityLogPanel.appendStatus("Switched to ${agentRegistry.getCurrentAgentName()} agent")
+    }
+
+    private void updateAgentSwitcherIndicator() {
+        if (agentSwitcherLabel != null) {
+            AgentType currentType = agentRegistry.getCurrentAgent()
+            String agentText = currentType.toString()
+            agentSwitcherLabel.setText(agentText)
+
+            if (currentType == AgentType.BUILD) {
+                agentSwitcherLabel.setForegroundColor(LanternaTheme.getAgentBuildColor())
+            } else {
+                agentSwitcherLabel.setForegroundColor(LanternaTheme.getAgentPlanColor())
             }
         }
     }
@@ -203,10 +239,28 @@ class LanternaTUI {
     private void processInput(String userInput, List<String> mentions = []) {
         List<Message> messages = []
 
+        // Get agent config for current type
+        AgentConfig agentConfig = agentRegistry.getCurrentAgentConfig()
+
+        // Load system prompt if available
+        def systemPrompt = agentConfig.loadPrompt()
+        if (systemPrompt && !systemPrompt.isEmpty()) {
+            messages << new Message('system', systemPrompt)
+        }
+
         messages << new Message('user', userInput)
 
         int maxIterations = 10
         int iteration = 0
+
+        // Filter tools based on agent type
+        List<Tool> allowedTools = []
+        tools.each { toolMap ->
+            def toolInstance = toolMap as Tool
+            if (agentConfig.isToolAllowed(toolInstance.name)) {
+                allowedTools << toolInstance
+            }
+        }
 
         while (iteration < maxIterations) {
             iteration++
@@ -218,7 +272,7 @@ class LanternaTUI {
                 request.model = currentModel
                 request.messages = messages
                 request.stream = false
-                request.tools = tools.collect { tool ->
+                request.tools = allowedTools.collect { tool ->
                     [
                         type: 'function',
                         function: [

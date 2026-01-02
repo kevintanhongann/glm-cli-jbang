@@ -66,6 +66,10 @@ class Config {
         Boolean colorsEnabled = true
         @JsonProperty("diff_context_lines")
         Integer diffContextLines = 3
+        @JsonProperty("agent_cycle_key")
+        String agentCycleKey = "tab"
+        @JsonProperty("agent_cycle_reverse_key")
+        String agentCycleReverseKey = "shift+tab"
     }
 
     static class ExperimentalConfig {

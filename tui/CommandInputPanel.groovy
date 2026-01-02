@@ -84,6 +84,16 @@ class CommandInputPanel {
                 return false
             }
 
+            // Tab to switch agent (only when autocomplete not visible)
+            if (keyType == KeyType.Tab && !autocompletePopup.isVisible()) {
+                if (key.isShiftDown()) {
+                    tui.cycleAgent(-1)  // Reverse cycling
+                } else {
+                    tui.cycleAgent(1)   // Forward cycling
+                }
+                return false
+            }
+
             // Check for @ mention trigger
             if (!key.isAltDown() && !key.isCtrlDown() &&
                 keyType == KeyType.Character && key.getCharacter() == '@') {

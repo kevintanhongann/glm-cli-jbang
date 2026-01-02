@@ -4,6 +4,7 @@ import models.ChatRequest
 import models.ChatResponse
 import models.Message
 import tools.Tool
+import tools.TaskTool
 import com.fasterxml.jackson.databind.ObjectMapper
 
 import tui.AnsiColors
@@ -40,12 +41,20 @@ class Agent {
     private int step = 0
     private final Config config
     private final List<ToolCallHistory> toolCallHistory = []
+    private final SubagentPool subagentPool
 
     Agent(String apiKey, String model) {
         this.client = new GlmClient(apiKey)
         this.model = model
         this.config = Config.load()
+        this.subagentPool = new SubagentPool(client, tools)
         AnsiColors.install()
+        
+        registerTool(new TaskTool(subagentPool))
+    }
+
+    void shutdown() {
+        subagentPool?.shutdown()
     }
 
     void registerTool(Tool tool) {

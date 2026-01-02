@@ -48,4 +48,12 @@ class LanternaTheme {
     static TextColor getToolColor() {
         return TextColor.ANSI.MAGENTA
     }
+
+    static TextColor getAgentBuildColor() {
+        return TextColor.ANSI.CYAN
+    }
+
+    static TextColor getAgentPlanColor() {
+        return TextColor.ANSI.YELLOW
+    }
 }
