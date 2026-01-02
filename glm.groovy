@@ -8,6 +8,9 @@
 // Groovy JSON module (required for JsonSlurper/JsonOutput in Groovy 4.x)
 //DEPS org.apache.groovy:groovy-json:4.0.27
 
+// Groovy SQL module for H2 database support
+//DEPS org.apache.groovy:groovy-sql:4.0.27
+
 // JWT for ZhipuAI authentication
 //DEPS com.auth0:java-jwt:4.4.0
 
@@ -22,6 +25,9 @@
 //DEPS org.fusesource.jansi:jansi:2.4.1
 //DEPS com.googlecode.lanterna:lanterna:3.1.2
 
+// H2 Database for session persistence
+//DEPS com.h2database:h2:2.2.224
+
 // Core sources
 // TODO: ZaiCodingPlanClient needs to be updated for new LangChain4j API
 // //SOURCES core/ZaiCodingPlanClient.groovy
@@ -29,6 +35,7 @@
 //SOURCES commands/ChatCommand.groovy
 //SOURCES commands/AgentCommand.groovy
 //SOURCES commands/AuthCommand.groovy
+//SOURCES commands/SessionCommand.groovy
 //SOURCES models/WebSearchResponse.groovy
 //SOURCES core/WebSearchClient.groovy
 //SOURCES core/GlmClient.groovy
@@ -61,6 +68,13 @@
 
 // Agent source
 //SOURCES core/Agent.groovy
+//SOURCES core/SessionManager.groovy
+//SOURCES core/MessageStore.groovy
+//SOURCES core/TokenTracker.groovy
+
+// Model sources
+//SOURCES models/Session.groovy
+//SOURCES models/TokenStats.groovy
 
 // TUI sources (Jexer based)
 //SOURCES tui/AnsiColors.groovy

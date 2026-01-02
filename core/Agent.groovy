@@ -42,15 +42,35 @@ class Agent {
     private final Config config
     private final List<ToolCallHistory> toolCallHistory = []
     private final SubagentPool subagentPool
+    private final SessionManager sessionManager
+    private final MessageStore messageStore
+    private final String sessionId
 
-    Agent(String apiKey, String model) {
+    Agent(String apiKey, String model, String sessionId = null) {
         this.client = new GlmClient(apiKey)
         this.model = model
         this.config = Config.load()
         this.subagentPool = new SubagentPool(client, tools)
+        this.sessionManager = SessionManager.instance
+        this.messageStore = new MessageStore()
+
         AnsiColors.install()
-        
+
         registerTool(new TaskTool(subagentPool))
+
+        // Create or resume session
+        if (sessionId) {
+            this.sessionId = sessionId
+            // Load existing messages
+            def existingMessages = messageStore.getMessages(sessionId)
+            history.addAll(existingMessages)
+        } else {
+            this.sessionId = sessionManager.createSession(
+                System.getProperty("user.dir"),
+                "BUILD",
+                model
+            )
+        }
     }
 
     void shutdown() {
@@ -92,6 +112,9 @@ class Agent {
         }
 
         history.add(new Message("user", prompt))
+        messageStore.saveMessage(sessionId, new Message("user", prompt))
+        sessionManager.touchSession(sessionId)
+
         OutputFormatter.printHeader("GLM Agent")
         OutputFormatter.printInfo("Task: ${prompt}")
 
@@ -122,6 +145,8 @@ class Agent {
                 OutputFormatter.printSection("Assistant")
                 println message.content
                 history.add(new Message("assistant", message.content))
+                messageStore.saveMessage(sessionId, new Message("assistant", message.content))
+                sessionManager.touchSession(sessionId)
             }
 
             if (choice.finishReason == "tool_calls" || (message.toolCalls != null && !message.toolCalls.isEmpty())) {

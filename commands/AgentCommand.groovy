@@ -28,6 +28,9 @@ class AgentCommand implements Runnable {
     @Option(names = ["--rag"], description = "Enable RAG-based code search (requires prior indexing)")
     boolean enableRag = false
 
+    @Option(names = ["-s", "--session"], description = "Resume existing session by ID")
+    String sessionId
+
     @Override
     void run() {
         Config config = Config.load()
@@ -47,7 +50,8 @@ class AgentCommand implements Runnable {
             return
         }
 
-        Agent agent = new Agent(apiKey, "glm-4.7") // Default to glm-4 for agent, or config.behavior.defaultModel
+        String modelToUse = config.behavior.defaultModel ?: "glm-4.7"
+        Agent agent = new Agent(apiKey, modelToUse, sessionId) // Use session ID if provided
 
         // Register standard tools
         agent.registerTool(new ReadFileTool())
