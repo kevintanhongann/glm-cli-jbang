@@ -58,17 +58,17 @@ class LanternaTUI {
 
     void start(String model = 'opencode/big-pickle', String cwd = null) {
         this.currentModel = model
-        
+
         def parts = model.split('/', 2)
         if (parts.length == 2) {
             this.providerId = parts[0]
             this.modelId = parts[1]
         } else {
             System.err.println("Warning: Model format should be 'provider/model-id'. Using default provider 'opencode'.")
-            this.providerId = "opencode"
+            this.providerId = 'opencode'
             this.modelId = parts[0]
         }
-        
+
         this.currentCwd = cwd ?: System.getProperty('user.dir')
 
         if (!initClient()) {
@@ -258,7 +258,7 @@ class LanternaTUI {
             handleSlashCommand(input)
             return
         }
-        
+
         activityLogPanel.appendUserMessage(input)
 
         Thread.start {
@@ -272,10 +272,10 @@ class LanternaTUI {
             appendSystemMessage("Unknown command: ${input}")
             return
         }
-        
+
         String command = parsed.name
         String args = parsed.arguments
-        
+
         switch (command) {
             case 'models':
                 // Defer dialog creation to avoid blocking in input filter context
@@ -283,7 +283,7 @@ class LanternaTUI {
                     showModelSelectionDialog()
                 }
                 break
-            
+
             case 'model':
                 if (args) {
                     switchModel(args)
@@ -291,63 +291,63 @@ class LanternaTUI {
                     appendSystemMessage("Current model: ${currentModel}")
                 }
                 break
-            
+
             case 'help':
                 showHelp()
                 break
-            
+
             case 'clear':
                 activityLogPanel.clear()
                 activityLogPanel.appendWelcomeMessage(currentModel)
-                appendSystemMessage("Chat history cleared")
+                appendSystemMessage('Chat history cleared')
                 break
-            
+
             case 'exit':
                 mainWindow.close()
                 break
-            
+
             default:
                 appendSystemMessage("Command '${command}' is not yet implemented")
         }
     }
-    
+
     private void appendSystemMessage(String message) {
         activityLogPanel.getTextBox().getRenderer().addLine("ℹ️  ${message}")
     }
-    
+
     void showModelSelectionDialog() {
         def dialog = new ModelSelectionDialog(textGUI)
         String selectedModel = dialog.show()
-        
+
         if (selectedModel) {
             switchModel(selectedModel)
         }
     }
-    
+
     private void switchModel(String newModel) {
         try {
             def parts = newModel.split('/', 2)
             if (parts.length != 2) {
-                activityLogPanel.appendSystemMessage("Invalid model format. Expected: provider/model-id")
+                activityLogPanel.appendSystemMessage('Invalid model format. Expected: provider/model-id')
                 return
             }
-            
+
             String newProviderId = parts[0]
             String newModelId = parts[1]
-            
+
             // Validate model exists
             def providerInfo = ModelCatalog.getProvider(newProviderId)
             if (!providerInfo) {
                 activityLogPanel.appendSystemMessage("Unknown provider: ${newProviderId}")
                 return
             }
-            
+
             def modelInfo = ModelCatalog.getModel(newModel)
             if (!modelInfo) {
                 activityLogPanel.appendSystemMessage("Unknown model: ${newModel}")
                 return
             }
-            
+
             // Check if provider is authenticated
             def authCredential = Auth.get(newProviderId)
             if (!authCredential) {
@@ -355,49 +355,69 @@ class LanternaTUI {
                 activityLogPanel.appendSystemMessage("Run 'glm auth login ${newProviderId}' to authenticate")
                 return
             }
-            
+
             // Update model state
             this.currentModel = newModel
             this.providerId = newProviderId
             this.modelId = newModelId
-            
+
             // Reinitialize client
             this.client = new GlmClient(newProviderId)
-            
+
             // Update UI
             updateWindowAndStatusBar()
-            
+
             activityLogPanel.appendSystemMessage("Switched to model: ${newModel}")
-            
         } catch (Exception e) {
             activityLogPanel.appendSystemMessage("Error switching model: ${e.message}")
         }
     }
-    
+
     private void updateWindowAndStatusBar() {
         // Update window title
         mainWindow.setTitle("GLM CLI - ${currentModel}")
-        
-        // Rebuild status bar to update model display
+
+        // Rebuild status bar by removing and re-adding all components
         statusBar.removeAllComponents()
-        def statusBarComponents = createStatusBar().getComponents()
-        statusBarComponents.each { statusBar.addComponent(it) }
+
+        // Re-add all status bar components with updated model
+        statusBar.addComponent(new Label("Model: ${currentModel}"))
+        statusBar.addComponent(new Label('  |  '))
+        statusBar.addComponent(new Label("Dir: ${Paths.get(currentCwd).fileName}"))
+        statusBar.addComponent(new Label('  |  '))
+
+        // Re-create scroll position label
+        scrollPositionLabel = new Label('')
+        statusBar.addComponent(scrollPositionLabel)
+
+        statusBar.addComponent(new Label('  |  '))
+        statusBar.addComponent(new Label('Ctrl+S: Save Log'))
+        statusBar.addComponent(new Label('  |  '))
+        statusBar.addComponent(new Label('Ctrl+C: Exit'))
+        statusBar.addComponent(new Label('  |  '))
+
+        // Re-create agent switcher indicator
+        agentSwitcherLabel = new Label(agentRegistry.getCurrentAgentName())
+        agentSwitcherLabel.setForegroundColor(LanternaTheme.getAgentBuildColor())
+        statusBar.addComponent(agentSwitcherLabel)
+
+        statusBar.addComponent(new Label(' (Tab/Shift+Tab to switch)'))
     }
-    
+
     private void showHelp() {
-        appendSystemMessage("=== Available Commands ===")
-        appendSystemMessage("/models   - Open model selection dialog")
-        appendSystemMessage("/model    - Show current model or switch to specific model")
-        appendSystemMessage("/help     - Show this help message")
-        appendSystemMessage("/clear    - Clear chat history")
-        appendSystemMessage("/exit     - Exit TUI")
-        appendSystemMessage("")
-        appendSystemMessage("Keyboard shortcuts:")
-        appendSystemMessage("Ctrl+M   - Open model selection dialog")
-        appendSystemMessage("Tab      - Switch agent")
-        appendSystemMessage("Ctrl+C   - Exit")
+        appendSystemMessage('=== Available Commands ===')
+        appendSystemMessage('/models   - Open model selection dialog')
+        appendSystemMessage('/model    - Show current model or switch to specific model')
+        appendSystemMessage('/help     - Show this help message')
+        appendSystemMessage('/clear    - Clear chat history')
+        appendSystemMessage('/exit     - Exit TUI')
+        appendSystemMessage('')
+        appendSystemMessage('Keyboard shortcuts:')
+        appendSystemMessage('Ctrl+M   - Open model selection dialog')
+        appendSystemMessage('Tab      - Switch agent')
+        appendSystemMessage('Ctrl+C   - Exit')
     }
-    
+
     private void processInput(String userInput, List<String> mentions = []) {
         List<Message> messages = []
 

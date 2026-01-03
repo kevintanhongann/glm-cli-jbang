@@ -347,6 +347,13 @@ class ActivityLogPanel {
         updateDisplay()
     }
 
+    void appendSystemMessage(String message) {
+        synchronized (content) {
+            content.append("ℹ️  ${message}\n")
+        }
+        updateDisplay()
+    }
+
     void appendSeparator() {
         synchronized (content) {
             content.append("\n")
