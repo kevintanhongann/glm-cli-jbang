@@ -4,57 +4,75 @@ import core.Auth
 import core.GlmClient
 import core.Config
 import core.ModelCatalog
+import core.AgentRegistry
+import core.AgentType
+import core.AgentConfig
+import core.TokenTracker
+import core.SessionStatsManager
+import core.Instructions
+import core.LspManager as SidebarLspManager
+import core.LSPManager as LspClientManager
+import core.LSPClient
 import models.ChatRequest
 import models.ChatResponse
 import models.Message
 import tools.ReadFileTool
 import tools.WriteFileTool
 import tools.ListFilesTool
+import tools.GrepTool
+import tools.GlobTool
+import tools.Tool
 import tools.WebSearchTool
 import tools.CodeSearchTool
 import rag.RAGPipeline
 import com.fasterxml.jackson.databind.ObjectMapper
+import java.util.UUID
+import java.nio.file.Paths
 
 import jexer.TApplication
 import jexer.TWindow
-import jexer.TText
-import jexer.TField
-import jexer.TAction
 import jexer.TMessageBox
-import jexer.TImage
 import jexer.event.TKeypressEvent
-import jexer.bits.CellAttributes
-import jexer.bits.Color
 import jexer.bits.ColorTheme
-import javax.imageio.ImageIO
-import java.awt.image.BufferedImage
-import java.nio.file.Files
-import java.nio.file.Paths
+import tui.widgets.JexerActivityLog
+import tui.widgets.JexerCommandInput
+import tui.widgets.JexerAutocompletePopup
+import tui.widgets.JexerStatusBar
+import tui.widgets.JexerSidebar
 import static jexer.TKeypress.*
 
 /**
  * Jexer-based TUI with dark OpenCode-style theme.
- * Provides a Turbo Vision-style UI for GLM CLI.
+ * Structurally matches LanternaTUI with full feature parity.
+ * Features: Activity log, sidebar, agent switching, model selection, LSP integration.
  */
 class JexerTUI extends TApplication {
 
     private String currentModel
     private String providerId
     private String modelId
+    private String sessionId
     private String currentCwd
-    private String apiKey
     private Config config
     private GlmClient client
     private ObjectMapper mapper = new ObjectMapper()
-    private List<Map> tools = []
+    private List<Tool> tools = []
+    private AgentRegistry agentRegistry
 
-    // UI components
-    private TWindow chatWindow
-    private TText chatLog
-    private AutocompleteField inputField
-    private AutocompletePopup autocompletePopup
-    private TImage logoImage
-    private StringBuilder logContent = new StringBuilder()
+    // Modular UI components
+    private JexerActivityLog activityLog
+    private JexerCommandInput commandInput
+    private JexerAutocompletePopup autocompletePopup
+    private JexerStatusBar statusBar
+    private JexerSidebar sidebarPanel
+
+    // Window references
+    private TWindow mainChatWindow
+    private TWindow sidebarWindow
+
+    // State
+    private boolean sidebarEnabled = true
+    private volatile boolean running = true
 
     /**
      * Create the Jexer application with dark theme.
@@ -62,70 +80,91 @@ class JexerTUI extends TApplication {
     JexerTUI() throws Exception {
         super(BackendType.XTERM)
 
-        // Apply dark theme
-        applyDarkTheme()
+        this.currentCwd = System.getProperty('user.dir')
+        this.agentRegistry = new AgentRegistry(AgentType.BUILD)
 
-    // Note: Ctrl+C handling is done in onKeypress() override
+        // Apply dark theme
+        JexerTheme.applyDarkTheme(this)
+
+        // Set up LSP tracking callback
+        setupLspCallbacks()
     }
 
     /**
-     * Handle keypress events for Ctrl+C exit.
+     * Handle keypress events for global shortcuts.
      */
     @Override
     protected boolean onKeypress(TKeypressEvent keypress) {
+        // Ctrl+C: Exit
         if (keypress.getKey().equals(kbCtrlC)) {
+            running = false
             exit()
             return true
         }
+
+        // Tab: Cycle agent forward
+        if (keypress.getKey().equals(kbTab)) {
+            cycleAgent(1)
+            return true
+        }
+
+        // Shift+Tab: Cycle agent backward
+        if (keypress.getKey().equals(kbShiftTab)) {
+            cycleAgent(-1)
+            return true
+        }
+
+        // Ctrl+S: Export log
+        if (keypress.getKey().equals(kbCtrlS)) {
+            if (activityLog != null) {
+                String exportPath = activityLog.exportLog()
+                if (exportPath) {
+                    activityLog.appendSystemMessage("Log exported to: ${exportPath}")
+                }
+            }
+            return true
+        }
+
         return super.onKeypress(keypress)
     }
 
     /**
-     * Apply dark OpenCode-style theme with safe null checks.
+     * Set up LSP tracking callbacks.
      */
-    private void applyDarkTheme() {
-        ColorTheme theme = getTheme()
-
-        // Helper to safely set colors
-        def setColor = { String key, Color fg, Color bg, boolean bold = false ->
-            try {
-                CellAttributes attr = theme.getColor(key)
-                if (attr != null) {
-                    attr.setForeColor(fg)
-                    attr.setBackColor(bg)
-                    if (bold) attr.setBold(true)
-                }
-            } catch (Exception e) {
-            // Ignore missing theme keys
+    private void setupLspCallbacks() {
+        try {
+            if (!LspClientManager.instance.isEnabled()) {
+                return
             }
+
+            LspClientManager.instance.setOnClientCreated { String serverId, LSPClient client, String root ->
+                // Register with sidebar LSP manager
+                SidebarLspManager.instance.registerLsp(sessionId, serverId, client, root)
+
+                // Update diagnostics status
+                Thread.start {
+                    try {
+                        Thread.sleep(500)
+                        int diagCount = client.getTotalDiagnosticCount()
+                        if (diagCount > 0) {
+                            SidebarLspManager.instance.updateLspStatus(
+                                sessionId,
+                                serverId,
+                                'connected',
+                                "${diagCount} diagnostics"
+                            )
+                        }
+                    } catch (Exception e) {
+                    // Ignore
+                    }
+                }
+
+                // Refresh sidebar
+                refreshSidebar()
+            }
+        } catch (Exception e) {
+        // LSP not available
         }
-
-        // Desktop/background
-        setColor('tdesktop.background', Color.WHITE, Color.BLACK)
-
-        // Window colors
-        setColor('twindow.border', Color.CYAN, Color.BLACK)
-        setColor('twindow.background', Color.WHITE, Color.BLACK)
-        setColor('twindow.border.inactive', Color.WHITE, Color.BLACK)
-        setColor('twindow.border.modal', Color.CYAN, Color.BLACK)
-        setColor('twindow.border.modal.inactive', Color.WHITE, Color.BLACK)
-
-        // Text and labels
-        setColor('ttext', Color.WHITE, Color.BLACK)
-        setColor('tlabel', Color.CYAN, Color.BLACK, true)
-
-        // Fields
-        setColor('tfield.active', Color.WHITE, Color.BLACK)
-        setColor('tfield.inactive', Color.WHITE, Color.BLACK)
-
-        // Buttons
-        setColor('tbutton.inactive', Color.WHITE, Color.BLACK)
-        setColor('tbutton.active', Color.BLACK, Color.CYAN)
-        setColor('tbutton.disabled', Color.WHITE, Color.BLACK)
-
-        // Menus
-        setColor('tmenu', Color.WHITE, Color.BLACK)
-        setColor('tmenu.highlighted', Color.BLACK, Color.CYAN)
     }
 
     /**
@@ -133,17 +172,18 @@ class JexerTUI extends TApplication {
      */
     void start(String model = 'opencode/big-pickle', String cwd = null) {
         this.currentModel = model
-        
+        this.sessionId = UUID.randomUUID().toString()
+
         def parts = model.split('/', 2)
         if (parts.length == 2) {
             this.providerId = parts[0]
             this.modelId = parts[1]
         } else {
             System.err.println("Warning: Model format should be 'provider/model-id'. Using default provider 'opencode'.")
-            this.providerId = "opencode"
+            this.providerId = 'opencode'
             this.modelId = parts[0]
         }
-        
+
         this.currentCwd = cwd ?: System.getProperty('user.dir')
 
         // Initialize client
@@ -153,6 +193,12 @@ class JexerTUI extends TApplication {
 
         // Set up UI
         setupUI()
+
+        // Start periodic sidebar refresh
+        startSidebarRefresh()
+
+        // Initialize LSP tracking
+        initializeLspTracking()
 
         // Run the application
         run()
@@ -189,10 +235,14 @@ class JexerTUI extends TApplication {
             return false
         }
 
-        // Register tools
+        // Register tools with session ID for tracking
+        def writeFileTool = new WriteFileTool()
+        writeFileTool.setSessionId(sessionId)
         tools << new ReadFileTool()
-        tools << new WriteFileTool()
+        tools << writeFileTool
         tools << new ListFilesTool()
+        tools << new GrepTool()
+        tools << new GlobTool()
 
         if (config?.webSearch?.enabled) {
             tools << new WebSearchTool(authCredential.key)
@@ -211,311 +261,401 @@ class JexerTUI extends TApplication {
     }
 
     /**
-     * Set up the UI components.
+     * Set up the UI components in modular fashion.
      */
     private void setupUI() {
-        // Create main chat window
-        int width = getScreen().getWidth()
-        int height = getScreen().getHeight()
+        int screenWidth = getScreen().getWidth()
+        int screenHeight = getScreen().getHeight()
 
-        chatWindow = addWindow(
+        // Auto-hide sidebar on small terminals (< 100 columns)
+        if (screenWidth < 100) {
+            sidebarEnabled = false
+        }
+
+        // Calculate dimensions
+        int sidebarWidth = sidebarEnabled ? 42 : 0
+        int mainContentWidth = screenWidth - sidebarWidth - 2
+        int activityLogHeight = screenHeight - 5  // Space for status bar + input
+
+        // Create main chat window
+        mainChatWindow = addWindow(
             "GLM CLI - ${currentModel}",
-            0, 0, width, height - 2,
-            TWindow.RESIZABLE | TWindow.CENTERED
+            0, 0, mainContentWidth, screenHeight - 2,
+            TWindow.CENTERED
         )
 
-        // Try to load and display logo image
-        int logoHeight = 0
-        try {
-            File logoFile = new File('assets/logo.png')
-            if (!logoFile.exists()) {
-                // Try relative to script location
-                logoFile = new File(System.getProperty('user.dir'), 'assets/logo.png')
+        // Create activity log component
+        activityLog = new JexerActivityLog(this, mainContentWidth - 2, activityLogHeight - 2)
+        activityLog.setX(1)
+        activityLog.setY(1)
+        activityLog.setOnScrollPositionChanged { int currentLine, int totalLines ->
+            if (statusBar != null) {
+                statusBar.setScrollPosition(currentLine, totalLines)
             }
-            if (logoFile.exists()) {
-                BufferedImage image = ImageIO.read(logoFile)
-                if (image != null) {
-                    // Calculate display size (scale to fit in window width, max 8 rows height)
-                    int imgWidth = Math.min(chatWindow.getWidth() - 4, 40)
-                    int imgHeight = Math.min(8, (int)(imgWidth * image.getHeight() / image.getWidth() / 2))
-                    
-                    // Create TImage widget
-                    logoImage = new TImage(chatWindow, 1, 1, imgWidth, imgHeight, image, 0, 0, null)
-                    logoImage.setScaleType(TImage.Scale.SCALE)
-                    logoHeight = imgHeight + 1
+        }
+        activityLog.appendWelcomeMessage(currentModel)
+
+        // Create command input component
+        commandInput = new JexerCommandInput(mainChatWindow, mainContentWidth - 10, currentCwd)
+        commandInput.setX(6)
+        commandInput.setY(activityLogHeight)
+        commandInput.setOnSubmit { String input, List<String> mentions ->
+            processUserInput(input, mentions)
+        }
+
+        // Create autocomplete popup
+        autocompletePopup = new JexerAutocompletePopup(this)
+        commandInput.setAutocompletePopup(autocompletePopup)
+
+        // Create status bar
+        statusBar = new JexerStatusBar(this, mainContentWidth)
+        statusBar.setX(1)
+        statusBar.setY(screenHeight - 2)
+        statusBar.setModel(currentModel)
+        statusBar.setDirectory(currentCwd)
+        statusBar.setAgent(agentRegistry.getCurrentAgentName())
+        statusBar.setSidebarEnabled(sidebarEnabled)
+
+        // Add widgets to main window
+        mainChatWindow.add(activityLog)
+        mainChatWindow.add(commandInput)
+        mainChatWindow.add(statusBar)
+
+        // Create sidebar window (if enabled)
+        if (sidebarEnabled) {
+            sidebarWindow = addWindow(
+                'Sidebar',
+                screenWidth - sidebarWidth - 1, 0, sidebarWidth, screenHeight - 2,
+                TWindow.NO_CLOSEBOX | TWindow.ABSOLUTEXY
+            )
+
+            sidebarPanel = new JexerSidebar(this, sessionId)
+            sidebarPanel.setX(0)
+            sidebarPanel.setY(0)
+            sidebarWindow.add(sidebarPanel)
+        }
+    }
+
+    /**
+     * Start periodic sidebar refresh thread.
+     */
+    private void startSidebarRefresh() {
+        Thread.start {
+            while (running) {
+                try {
+                    Thread.sleep(2000)
+
+                    if (sidebarPanel && sidebarPanel.getExpanded()) {
+                        // Update LSP diagnostic counts
+                        try {
+                            SidebarLspManager.instance.updateDiagnosticCounts(sessionId)
+                        } catch (Exception e) {
+                        // Ignore
+                        }
+
+                        // Refresh sidebar
+                        refreshSidebar()
+                    }
+                } catch (InterruptedException e) {
+                    break
+                } catch (Exception e) {
+                    System.err.println("Sidebar refresh error: ${e.message}")
+                }
+            }
+        }
+    }
+
+    /**
+     * Initialize LSP tracking by touching a file in the working directory.
+     */
+    private void initializeLspTracking() {
+        try {
+            if (!LspClientManager.instance.isEnabled()) {
+                return
+            }
+
+            Thread.start {
+                try {
+                    def filesToTouch = [
+                        'glm.groovy',
+                        'README.md',
+                        'package.json',
+                        'pom.xml',
+                        'build.gradle'
+                    ]
+
+                    for (file in filesToTouch) {
+                        def filePath = new File(currentCwd, file).absolutePath
+                        if (new File(filePath).exists()) {
+                            try {
+                                LspClientManager.instance.touchFile(filePath, false)
+                                break
+                            } catch (Exception e) {
+                            // Try next file
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                // Don't fail TUI if LSP init fails
                 }
             }
         } catch (Exception e) {
-            // Image loading failed, will use ASCII art below
-        }
-
-        // Add header text below image (or ASCII art if no image)
-        if (logoHeight == 0) {
-            appendAsciiArt()
-            logoHeight = 13  // ASCII art height (12 lines + 1 blank)
-        } else {
-            // Add minimal text header when image is shown
-            appendLog('')
-            appendLog("Model: ${currentModel}")
-            appendLog('Type your message and press Enter. Press Ctrl+Q to quit.')
-            appendLog('')
-        }
-
-        // Create text area for chat log (positioned below logo/header)
-        chatLog = chatWindow.addText(
-            logContent.toString(),
-            1, logoHeight,
-            chatWindow.getWidth() - 4,
-            chatWindow.getHeight() - logoHeight - 4
-        )
-
-        // Create input field at bottom with autocomplete support
-        chatWindow.addLabel('You> ', 1, chatWindow.getHeight() - 4)
-        
-        int inputY = chatWindow.getHeight() - 4
-        int inputWidth = chatWindow.getWidth() - 8
-        
-        // Create autocomplete popup (positioned above input)
-        autocompletePopup = new AutocompletePopup(
-            chatWindow,
-            6,
-            inputY - 10  // Above the input field
-        )
-        autocompletePopup.setPopupVisible(false)
-        
-        // Create custom autocomplete field
-        inputField = new AutocompleteField(
-            chatWindow,
-            6, inputY,
-            inputWidth,
-            false,
-            ''
-        )
-        inputField.setPopup(autocompletePopup)
-
-        // Handle Enter key on input field
-        inputField.setEnterAction(new TAction() {
-
-            @Override
-            void DO() {
-                String input = inputField.getText().trim()
-                if (!input.isEmpty()) {
-                    // Extract file mentions before clearing
-                    List<String> mentions = inputField.extractMentions()
-                    inputField.setText('')
-                    // Run in background thread so UI updates immediately
-                    Thread.start {
-                        handleInput(input, mentions)
-                    }
-                }
-            }
-
-        })
-
-        // Focus on input field
-        inputField.activate()
-    }
-
-    /**
-     * Append ASCII art logo as fallback.
-     */
-    private void appendAsciiArt() {
-        appendLog('+--------------------------------------------------+')
-        appendLog('|   ____  _     __  __    ____  _     ___          |')
-        appendLog('|  / ___|| |   |  \\/  |  / ___|| |   |_ _|         |')
-        appendLog('| | |  _ | |   | |\\/| | | |    | |    | |          |')
-        appendLog('| | |_| || |___| |  | | | |___ | |___ | |          |')
-        appendLog('|  \\____||_____|_|  |_|  \\____||_____|___|         |')
-        appendLog('|                                                  |')
-        appendLog("|  Model: ${currentModel.padRight(40)}|")
-        appendLog('|  Type your message and press Enter               |')
-        appendLog('|  Press Ctrl+Q to quit                            |')
-        appendLog('+--------------------------------------------------+')
-        appendLog('')
-    }
-
-    /**
-     * Append text to the chat log.
-     */
-    private void appendLog(String text) {
-        logContent.append(text).append("\n")
-        if (chatLog != null) {
-            chatLog.setText(logContent.toString())
-            // Scroll to bottom
-            chatLog.toBottom()
+        // LSP not available
         }
     }
 
     /**
-     * Handle user input with optional file mentions.
+     * Process user input with optional file mentions.
      */
-    private void handleInput(String input, List<String> mentions = []) {
-        // Handle commands
-        if (input.equalsIgnoreCase('exit') || input.equalsIgnoreCase('quit')) {
-            exit()
-            return
-        }
-
+    void processUserInput(String input, List<String> mentions = []) {
+        // Handle slash commands
         if (input.startsWith('/')) {
-            handleCommand(input)
+            handleSlashCommand(input)
             return
         }
 
-        // Add user message to log
-        appendLog("You> ${input}")
-        
-        // Show mentioned files
-        if (mentions && !mentions.isEmpty()) {
-            appendLog("  📎 Attached: ${mentions.join(', ')}")
-        }
-        appendLog('')
+        activityLog.appendUserMessage(input)
 
-        // Process with AI, including file context
-        processInput(input, mentions)
+        Thread.start {
+            processInput(input, mentions)
+        }
     }
 
     /**
-     * Handle slash commands with improved parsing.
+     * Handle slash commands.
      */
-    private void handleCommand(String cmd) {
-        def parsed = CommandProvider.parse(cmd)
-        if (parsed == null) return
-        
-        String name = parsed.name.toLowerCase()
+    private void handleSlashCommand(String input) {
+        def parsed = CommandProvider.parse(input)
+        if (!parsed) {
+            activityLog.appendSystemMessage("Unknown command: ${input}")
+            return
+        }
+
+        String command = parsed.name.toLowerCase()
         String args = parsed.arguments ?: ''
-        
-        switch (name) {
-            case 'help':
-            case 'commands':
-                appendLog('Commands:')
-                CommandProvider.getCommands().each { item ->
-                    def cmdDef = CommandProvider.get(item.value)
-                    String desc = cmdDef?.description ?: ''
-                    appendLog("  /${item.value.padRight(10)} - ${desc}")
-                }
-                appendLog('')
-                appendLog('File mentions:')
-                appendLog('  @filename   - Attach file to context')
-                appendLog('  @path#L10   - Attach specific line')
-                appendLog('  @path#L1-50 - Attach line range')
-                appendLog('')
-                break
-                
-            case 'clear':
-                logContent = new StringBuilder()
-                appendAsciiArt()
-                appendLog('Chat cleared.')
-                appendLog('')
-                break
-                
-            case 'model':
-                if (args.isEmpty()) {
-                    appendLog("Current model: ${currentModel}")
-                } else {
-                    def parts = args.split('/', 2)
-                    if (parts.length != 2) {
-                        appendLog("Error: Model format should be 'provider/model-id'")
-                        appendLog("Example: opencode/big-pickle")
-                    } else {
-                        def newProviderId = parts[0]
-                        def newModelId = parts[1]
-                        
-                        def providerInfo = ModelCatalog.getProvider(newProviderId)
-                        if (!providerInfo) {
-                            appendLog("Error: Unknown provider '${newProviderId}'")
-                        } else {
-                            currentModel = args
-                            providerId = newProviderId
-                            modelId = newModelId
-                            appendLog("Model changed to: ${currentModel}")
-                            appendLog("Note: Restart TUI to apply model change")
-                        }
-                    }
-                }
-                appendLog('')
-                break
-                
+
+        switch (command) {
             case 'models':
-                appendLog('Available models:')
-                def allModels = ModelCatalog.getAllModels()
-                allModels.values().sort { a, b -> a.provider <=> b.provider }.each { model ->
-                    def isFree = model.cost?.input == 0 && model.cost?.output == 0
-                    def freeTag = isFree ? ' (Free)' : ''
-                    appendLog("  ${model.provider}/${model.id}${freeTag} - ${model.name}")
-                }
-                appendLog('')
+                showModels()
                 break
-                
-            case 'cwd':
-                if (args.isEmpty()) {
-                    appendLog("Working directory: ${currentCwd}")
+
+            case 'model':
+                if (args) {
+                    switchModel(args)
                 } else {
+                    activityLog.appendSystemMessage("Current model: ${currentModel}")
+                }
+                break
+
+            case 'sidebar':
+                toggleSidebar()
+                break
+
+            case 'help':
+                showHelp()
+                break
+
+            case 'clear':
+                activityLog.clear()
+                activityLog.appendWelcomeMessage(currentModel)
+                activityLog.appendSystemMessage('Chat history cleared')
+                break
+
+            case 'cwd':
+                if (args) {
                     def newDir = new File(args)
                     if (newDir.isDirectory()) {
                         currentCwd = newDir.absolutePath
-                        appendLog("Changed to: ${currentCwd}")
+                        if (statusBar) {
+                            statusBar.setDirectory(currentCwd)
+                        }
+                        activityLog.appendSystemMessage("Changed to: ${currentCwd}")
                     } else {
-                        appendLog("Not a directory: ${args}")
+                        activityLog.appendError("Not a directory: ${args}")
                     }
+                } else {
+                    activityLog.appendSystemMessage("Working directory: ${currentCwd}")
                 }
-                appendLog('')
                 break
-                
+
             case 'ls':
                 String path = args.isEmpty() ? currentCwd : args
                 def dir = new File(path)
                 if (dir.isDirectory()) {
-                    appendLog("Contents of ${path}:")
+                    activityLog.appendSystemMessage("Contents of ${path}:")
                     dir.listFiles()?.sort()?.take(20)?.each { f ->
                         String icon = f.isDirectory() ? '📁' : '📄'
-                        appendLog("  ${icon} ${f.name}")
+                        activityLog.appendSystemMessage("  ${icon} ${f.name}")
                     }
                 } else {
-                    appendLog("Not a directory: ${path}")
+                    activityLog.appendError("Not a directory: ${path}")
                 }
-                appendLog('')
                 break
-                
+
             case 'read':
-                if (args.isEmpty()) {
-                    appendLog('Usage: /read <filename>')
-                } else {
+                if (args) {
                     readAndShowFile(args)
+                } else {
+                    activityLog.appendSystemMessage('Usage: /read <filename>')
                 }
-                appendLog('')
                 break
-                
+
             case 'tools':
-                appendLog('Available tools:')
+                activityLog.appendSystemMessage('Available tools:')
                 tools.each { tool ->
-                    appendLog("  ${tool.name} - ${tool.description?.take(50) ?: ''}")
+                    activityLog.appendSystemMessage("  ${tool.name} - ${tool.description?.take(50) ?: ''}")
                 }
-                appendLog('')
                 break
-                
+
             case 'context':
-                appendLog("Model: ${currentModel}")
-                appendLog("Working directory: ${currentCwd}")
-                appendLog("Tools: ${tools.size()} registered")
-                appendLog('')
+                activityLog.appendSystemMessage("Model: ${currentModel}")
+                activityLog.appendSystemMessage("Working directory: ${currentCwd}")
+                activityLog.appendSystemMessage("Agent: ${agentRegistry.getCurrentAgentName()}")
+                activityLog.appendSystemMessage("Tools: ${tools.size()} registered")
                 break
-                
-            case 'debug':
-                appendLog('Debug mode toggled')
-                appendLog('')
-                break
-                
+
             case 'exit':
+                running = false
                 exit()
                 break
-                
+
             default:
-                appendLog("Unknown command: /${name}")
-                appendLog("Type /help for available commands")
-                appendLog('')
+                activityLog.appendSystemMessage("Command '${command}' is not yet implemented")
         }
     }
-    
+
+    /**
+     * Show available models.
+     */
+    private void showModels() {
+        activityLog.appendSystemMessage('Available models:')
+        def allModels = ModelCatalog.getAllModels()
+        allModels.values().sort { a, b -> a.provider <=> b.provider }.each { model ->
+            def isFree = model.cost?.input == 0 && model.cost?.output == 0
+            def freeTag = isFree ? ' (Free)' : ''
+            activityLog.appendSystemMessage("  ${model.provider}/${model.id}${freeTag} - ${model.name}")
+    }
+}
+
+    /**
+     * Switch to a new model.
+     */
+    private void switchModel(String newModel) {
+        try {
+            def parts = newModel.split('/', 2)
+            if (parts.length != 2) {
+                activityLog.appendError('Invalid model format. Expected: provider/model-id')
+                return
+            }
+
+            String newProviderId = parts[0]
+            String newModelId = parts[1]
+
+            // Validate provider
+            def providerInfo = ModelCatalog.getProvider(newProviderId)
+            if (!providerInfo) {
+                activityLog.appendError("Unknown provider: ${newProviderId}")
+                return
+            }
+
+            // Validate model
+            def modelInfo = ModelCatalog.getModel(newModel)
+            if (!modelInfo) {
+                activityLog.appendError("Unknown model: ${newModel}")
+                return
+            }
+
+            // Check authentication
+            def authCredential = Auth.get(newProviderId)
+            if (!authCredential) {
+                activityLog.appendError("Not authenticated for provider '${newProviderId}'")
+                activityLog.appendSystemMessage("Run 'glm auth login ${newProviderId}' to authenticate")
+                return
+            }
+
+            // Update model state
+            this.currentModel = newModel
+            this.providerId = newProviderId
+            this.modelId = newModelId
+
+            // Reinitialize client
+            this.client = new GlmClient(newProviderId)
+
+            // Update UI
+            updateWindowAndStatusBar()
+
+            activityLog.appendSystemMessage("Switched to model: ${newModel}")
+        } catch (Exception e) {
+            activityLog.appendError("Error switching model: ${e.message}")
+        }
+    }
+
+    /**
+     * Update window title and status bar after model change.
+     */
+    private void updateWindowAndStatusBar() {
+        mainChatWindow.setTitle("GLM CLI - ${currentModel}")
+
+        if (statusBar) {
+            statusBar.setModel(currentModel)
+        }
+    }
+
+    /**
+     * Show help message.
+     */
+    private void showHelp() {
+        activityLog.appendSystemMessage('=== Available Commands ===')
+        activityLog.appendSystemMessage('/models   - List available models')
+        activityLog.appendSystemMessage('/model    - Show current model or switch to specific model')
+        activityLog.appendSystemMessage('/help     - Show this help message')
+        activityLog.appendSystemMessage('/clear    - Clear chat history')
+        activityLog.appendSystemMessage('/cwd      - Show/change working directory')
+        activityLog.appendSystemMessage('/ls       - List files in directory')
+        activityLog.appendSystemMessage('/read     - Read a file')
+        activityLog.appendSystemMessage('/tools    - List available tools')
+        activityLog.appendSystemMessage('/context  - Show current context')
+        if (sidebarEnabled) {
+            activityLog.appendSystemMessage('/sidebar  - Toggle sidebar')
+        }
+        activityLog.appendSystemMessage('/exit     - Exit TUI')
+        activityLog.appendSystemMessage('')
+        activityLog.appendSystemMessage('Keyboard shortcuts:')
+        activityLog.appendSystemMessage('Tab        - Switch agent forward')
+        activityLog.appendSystemMessage('Shift+Tab  - Switch agent backward')
+        activityLog.appendSystemMessage('Ctrl+S     - Export activity log')
+        activityLog.appendSystemMessage('Ctrl+C     - Exit')
+    }
+
+    /**
+     * Toggle sidebar visibility.
+     */
+    void toggleSidebar() {
+        if (!sidebarPanel) return
+        sidebarPanel.toggle()
+        activityLog.appendSystemMessage(sidebarPanel.getExpanded() ? 'Sidebar shown' : 'Sidebar hidden')
+    }
+
+    /**
+     * Refresh sidebar content.
+     */
+    void refreshSidebar() {
+        if (sidebarPanel) {
+            sidebarPanel.refresh()
+        }
+    }
+
+    /**
+     * Cycle agent (Tab/Shift+Tab).
+     */
+    void cycleAgent(int direction = 1) {
+        agentRegistry.cycleAgent(direction)
+        if (statusBar) {
+            statusBar.setAgent(agentRegistry.getCurrentAgentName())
+        }
+        activityLog.appendSystemMessage("Switched to ${agentRegistry.getCurrentAgentName()} agent")
+    }
+
     /**
      * Read and display a file with optional line range.
      */
@@ -524,101 +664,77 @@ class JexerTUI extends TApplication {
         String path = parsed.baseQuery
         Integer startLine = parsed.startLine
         Integer endLine = parsed.endLine
-        
+
         File file = new File(path)
         if (!file.isAbsolute()) {
             file = new File(currentCwd, path)
         }
-        
+
         if (!file.exists()) {
-            appendLog("File not found: ${path}")
+            activityLog.appendError("File not found: ${path}")
             return
         }
-        
+
         try {
             List<String> lines = file.readLines()
             int start = startLine ? Math.max(1, startLine) : 1
             int end = endLine ? Math.min(lines.size(), endLine) : Math.min(lines.size(), start + 20)
-            
-            appendLog("── ${file.name} (lines ${start}-${end} of ${lines.size()}) ──")
+
+            activityLog.appendSystemMessage("── ${file.name} (lines ${start}-${end} of ${lines.size()}) ──")
             for (int i = start - 1; i < end && i < lines.size(); i++) {
-                appendLog("${(i + 1).toString().padLeft(4)}: ${lines[i]}")
+                activityLog.appendSystemMessage("${(i + 1).toString().padLeft(4)}: ${lines[i]}")
             }
-            appendLog("────────────────────────────────────────")
+            activityLog.appendSystemMessage('────────────────────────────────────────────────')
         } catch (Exception e) {
-            appendLog("Error reading file: ${e.message}")
+            activityLog.appendError("Error reading file: ${e.message}")
         }
     }
 
     /**
-     * Process user input with AI, including file context from mentions.
+     * Process input with AI and tool execution.
      */
     private void processInput(String userInput, List<String> mentions = []) {
         List<Message> messages = []
-        
-        // Build context with mentioned files
-        StringBuilder contextBuilder = new StringBuilder()
-        
-        if (mentions && !mentions.isEmpty()) {
-            contextBuilder.append("# Referenced Files\n\n")
-            mentions.each { mention ->
-                def parsed = FileProvider.extractLineRange(mention)
-                String path = parsed.baseQuery
-                Integer startLine = parsed.startLine
-                Integer endLine = parsed.endLine
-                
-                File file = new File(path)
-                if (!file.isAbsolute()) {
-                    file = new File(currentCwd, path)
-                }
-                
-                if (file.exists() && file.isFile()) {
-                    try {
-                        List<String> lines = file.readLines()
-                        int start = startLine ? Math.max(1, startLine) : 1
-                        int end = endLine ? Math.min(lines.size(), endLine) : lines.size()
-                        
-                        contextBuilder.append("## ${file.name}")
-                        if (startLine) {
-                            contextBuilder.append(" (lines ${start}-${end})")
-                        }
-                        contextBuilder.append("\n```${getFileExtension(file.name)}\n")
-                        
-                        for (int i = start - 1; i < end && i < lines.size(); i++) {
-                            contextBuilder.append(lines[i]).append('\n')
-                        }
-                        contextBuilder.append("```\n\n")
-                    } catch (Exception e) {
-                        contextBuilder.append("## ${file.name}\nError reading file: ${e.message}\n\n")
-                    }
-                } else {
-                    contextBuilder.append("## ${mention}\nFile not found\n\n")
-                }
-            }
-            contextBuilder.append("---\n\n")
+
+        // Load AGENTS.md custom instructions
+        def customInstructions = Instructions.loadAll(currentCwd)
+        customInstructions.each { instruction ->
+            messages << new Message('system', instruction)
         }
-        
-        String fullInput = contextBuilder.length() > 0 
-            ? contextBuilder.toString() + "# User Request\n" + userInput
-            : userInput
-            
-        messages << new Message('user', fullInput)
+
+        // Get agent config for current type
+        AgentConfig agentConfig = agentRegistry.getCurrentAgentConfig()
+
+        // Load agent-specific system prompt
+        def promptFile = new File("prompts/${agentConfig.type.name().toLowerCase()}.txt")
+        if (promptFile.exists()) {
+            messages << new Message('system', promptFile.text)
+        }
+
+        messages << new Message('user', userInput)
 
         int maxIterations = 10
         int iteration = 0
 
+        // Filter tools based on agent type
+        List<Tool> allowedTools = []
+        tools.each { tool ->
+            if (agentConfig.isToolAllowed(tool.name)) {
+                allowedTools << tool
+            }
+        }
+
         while (iteration < maxIterations) {
             iteration++
 
-            appendLog('GLM> Thinking...')
+            activityLog.appendStatus('Thinking...')
 
             try {
-                // Prepare request
                 ChatRequest request = new ChatRequest()
                 request.model = modelId
                 request.messages = messages
                 request.stream = false
-                request.tools = tools.collect { tool ->
+                request.tools = allowedTools.collect { tool ->
                     [
                         type: 'function',
                         function: [
@@ -629,27 +745,33 @@ class JexerTUI extends TApplication {
                     ]
                 }
 
-                // Send request
                 String responseJson = client.sendMessage(request)
                 ChatResponse response = mapper.readValue(responseJson, ChatResponse.class)
 
                 def choice = response.choices[0]
                 def message = choice.message
 
-                // Clear "Thinking..." and show response
-                if (message.content) {
-                    // Remove the "Thinking..." line
-                    String log = logContent.toString()
-                    int thinkingIdx = log.lastIndexOf('GLM> Thinking...')
-                    if (thinkingIdx >= 0) {
-                        logContent = new StringBuilder(log.substring(0, thinkingIdx))
-                    }
+                // Track token usage
+                if (response.usage) {
+                    int inputTokens = response.usage.promptTokens ?: 0
+                    int outputTokens = response.usage.completionTokens ?: 0
+                    BigDecimal cost = response.usage.cost ?: 0.0000
 
-                    appendLog("GLM> ${message.content}")
-                    appendLog('')
+                    // Update in-memory and database
+                    TokenTracker.instance.recordTokens(sessionId, inputTokens, outputTokens, cost)
+                    SessionStatsManager.instance.updateTokenCount(sessionId, inputTokens, outputTokens, cost)
+
+                    // Refresh sidebar to show updated token count
+                    refreshSidebar()
                 }
 
-                // Check for tool calls
+                activityLog.removeStatus()
+
+                if (message.content) {
+                    activityLog.appendAIResponse(message.content)
+                    activityLog.appendSeparator()
+                }
+
                 if (choice.finishReason == 'tool_calls' || (message.toolCalls != null && !message.toolCalls.isEmpty())) {
                     messages << message
 
@@ -658,12 +780,11 @@ class JexerTUI extends TApplication {
                         String arguments = toolCall.function.arguments
                         String callId = toolCall.id
 
-                        // Show tool execution
                         Map<String, Object> args = mapper.readValue(arguments, Map.class)
                         String toolDisplay = formatToolCall(functionName, args)
-                        appendLog("  → ${toolDisplay}")
 
-                        // Execute tool
+                        activityLog.appendToolExecution(toolDisplay)
+
                         def tool = tools.find { it.name == functionName }
                         String result = ''
 
@@ -679,48 +800,45 @@ class JexerTUI extends TApplication {
 
                                     if (confirm != TMessageBox.Result.YES) {
                                         result = 'User cancelled write operation'
-                                        appendLog('    ✗ Cancelled')
+                                        activityLog.appendToolError('Cancelled')
                                     } else {
                                         Object output = tool.execute(args)
                                         result = output.toString()
-                                        appendLog('    ✓ Written')
+                                        activityLog.appendToolResult('Success')
                                     }
                                 } else {
                                     Object output = tool.execute(args)
                                     result = output.toString()
-                                    appendLog('    ✓ Done')
+                                    activityLog.appendToolResult('Success')
                                 }
                             } catch (Exception e) {
                                 result = "Error: ${e.message}"
-                                appendLog("    ✗ ${e.message}")
+                                activityLog.appendToolError(e.message)
                             }
                         } else {
                             result = 'Error: Tool not found'
-                            appendLog('    ✗ Unknown tool')
+                            activityLog.appendToolError('Tool not found')
                         }
 
-                        // Add tool result
                         Message toolMsg = new Message()
                         toolMsg.role = 'tool'
                         toolMsg.content = result
                         toolMsg.toolCallId = callId
                         messages << toolMsg
                     }
-                    appendLog('')
+                    activityLog.appendSeparator()
                 } else {
-                    // No tool calls, done
                     break
                 }
             } catch (Exception e) {
-                appendLog("Error: ${e.message}")
-                appendLog('')
+                activityLog.removeStatus()
+                activityLog.appendError(e.message)
                 break
             }
         }
 
         if (iteration >= maxIterations) {
-            appendLog('⚠️ Reached maximum iterations')
-            appendLog('')
+            activityLog.appendWarning('Reached maximum iterations')
         }
     }
 
@@ -735,6 +853,10 @@ class JexerTUI extends TApplication {
                 return "Write ${args.path}"
             case 'list_files':
                 return "List ${args.path ?: '.'}"
+            case 'grep':
+                return "Grep \"${truncate(args.pattern?.toString(), 30)}\""
+            case 'glob':
+                return "Glob \"${truncate(args.pattern?.toString(), 30)}\""
             case 'web_search':
                 return "Search \"${truncate(args.query?.toString(), 30)}\""
             case 'code_search':
@@ -750,39 +872,6 @@ class JexerTUI extends TApplication {
     private static String truncate(String s, int maxLen) {
         if (!s || s.length() <= maxLen) return s ?: ''
         return s.substring(0, maxLen - 3) + '...'
-    }
-
-    /**
-     * Get file extension for syntax highlighting.
-     */
-    private static String getFileExtension(String filename) {
-        int dot = filename.lastIndexOf('.')
-        if (dot < 0) return ''
-        
-        String ext = filename.substring(dot + 1).toLowerCase()
-        switch (ext) {
-            case 'groovy': return 'groovy'
-            case 'java': return 'java'
-            case 'kt': return 'kotlin'
-            case 'js': return 'javascript'
-            case 'ts': return 'typescript'
-            case 'jsx': case 'tsx': return 'tsx'
-            case 'py': return 'python'
-            case 'rb': return 'ruby'
-            case 'go': return 'go'
-            case 'rs': return 'rust'
-            case 'c': case 'h': return 'c'
-            case 'cpp': case 'hpp': return 'cpp'
-            case 'json': return 'json'
-            case 'yaml': case 'yml': return 'yaml'
-            case 'xml': return 'xml'
-            case 'md': return 'markdown'
-            case 'sh': case 'bash': return 'bash'
-            case 'html': return 'html'
-            case 'css': return 'css'
-            case 'sql': return 'sql'
-            default: return ext
-        }
     }
 
 }
