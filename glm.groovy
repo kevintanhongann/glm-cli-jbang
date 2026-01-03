@@ -1,6 +1,6 @@
 ///usr/bin/env jbang "$0" "$@" ; exit $?
 //DEPS dev.langchain4j:langchain4j:1.10.0
-//DEPS ./jexer-2.0.0-full.jar
+//DEPS io.gitlab.autumnmeowmeow:jexer:2.0.0
 //DEPS info.picocli:picocli:4.7.7
 //DEPS info.picocli:picocli-groovy:4.7.7
 //DEPS dev.langchain4j:langchain4j-zhipu-ai:0.36.2

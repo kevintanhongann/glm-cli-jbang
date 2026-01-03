@@ -29,7 +29,7 @@ class JexerCommandInput extends TField {
     private TWindow parentWindow
 
     JexerCommandInput(TWindow parent, int width, String cwd = null) {
-        super(width, '', false)
+        super(parent, 0, 0, width, false)
         this.parentWindow = parent
         this.currentCwd = cwd ?: System.getProperty('user.dir')
     }

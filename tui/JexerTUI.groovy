@@ -285,7 +285,7 @@ class JexerTUI extends TApplication {
         )
 
         // Create activity log component
-        activityLog = new JexerActivityLog(this, mainContentWidth - 2, activityLogHeight - 2)
+        activityLog = new JexerActivityLog(mainChatWindow, mainContentWidth - 2, activityLogHeight - 2)
         activityLog.setX(1)
         activityLog.setY(1)
         activityLog.setOnScrollPositionChanged { int currentLine, int totalLines ->
@@ -326,7 +326,7 @@ class JexerTUI extends TApplication {
             sidebarWindow = addWindow(
                 'Sidebar',
                 screenWidth - sidebarWidth - 1, 0, sidebarWidth, screenHeight - 2,
-                TWindow.NO_CLOSEBOX | TWindow.ABSOLUTEXY
+                TWindow.NOCLOSEBOX | TWindow.ABSOLUTEXY
             )
 
             sidebarPanel = new JexerSidebar(this, sessionId)

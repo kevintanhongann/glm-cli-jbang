@@ -97,7 +97,7 @@ class JexerTUIEnhanced {
             this.modelId = parts[1]
         } else {
             System.err.println("Warning: Model format should be 'provider/model-id'. Using default provider 'opencode'.")
-            this.providerId = "opencode"
+            this.providerId = 'opencode'
             this.modelId = parts[0]
         }
 
@@ -193,7 +193,7 @@ class JexerTUIEnhanced {
                         core.LspManager.instance.updateLspStatus(
                             sessionId,
                             serverId,
-                            "connected",
+                            'connected',
                             "${diagCount} diagnostics"
                         )
                     }
@@ -239,11 +239,11 @@ class JexerTUIEnhanced {
         Thread.start {
             try {
                 def filesToTouch = [
-                    "glm.groovy",
-                    "README.md",
-                    "package.json",
-                    "pom.xml",
-                    "build.gradle"
+                    'glm.groovy',
+                    'README.md',
+                    'package.json',
+                    'pom.xml',
+                    'build.gradle'
                 ]
 
                 for (file in filesToTouch) {
@@ -325,9 +325,9 @@ class JexerTUIEnhanced {
         // Create sidebar window (if enabled)
         if (sidebarEnabled) {
             sidebarWindow = app.addWindow(
-                "Sidebar",
+                'Sidebar',
                 screenWidth - sidebarWidth - 1, 0, sidebarWidth, screenHeight - 2,
-                TWindow.NO_CLOSEBOX | TWindow.ABSOLUTEXY
+                TWindow.NOCLOSEBOX | TWindow.ABSOLUTEXY
             )
 
             sidebarPanel = new JexerSidebar(app, sessionId)
@@ -522,8 +522,8 @@ class JexerTUIEnhanced {
             def isFree = model.cost?.input == 0 && model.cost?.output == 0
             def freeTag = isFree ? ' (Free)' : ''
             activityLog.appendSystemMessage("  ${model.provider}/${model.id}${freeTag} - ${model.name}")
-        }
     }
+}
 
     /**
      * Read and display a file.
@@ -777,4 +777,5 @@ class JexerTUIEnhanced {
         if (!s || s.length() <= maxLen) return s ?: ''
         return s.substring(0, maxLen - 3) + '...'
     }
+
 }

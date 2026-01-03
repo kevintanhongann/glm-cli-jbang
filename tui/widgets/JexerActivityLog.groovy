@@ -1,5 +1,6 @@
 package tui.widgets
 
+import jexer.TWidget
 import jexer.TText
 import jexer.TApplication
 import jexer.bits.CellAttributes
@@ -20,16 +21,13 @@ class JexerActivityLog extends TText {
     private String statusLine = null
     private boolean timestampsEnabled = true
     private Closure onScrollPositionChanged = null
-    private TApplication application
     private int scrollPosition = 0
 
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern('HH:mm:ss')
     private static final int MAX_DISPLAY_LINES = 1000
 
-    JexerActivityLog(TApplication app, int width, int height) {
-        super('', width, height)
-        this.application = app
-        setReadOnly(true)
+    JexerActivityLog(TWidget parent, int width, int height) {
+        super(parent, '', 0, 0, width, height)
     }
 
     /**
@@ -317,4 +315,5 @@ class JexerActivityLog extends TText {
         }
         updateDisplay()
     }
+
 }

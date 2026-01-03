@@ -24,8 +24,19 @@ class JexerAutocompletePopup extends TWindow {
     private Closure onSelectionCallback = null
 
     JexerAutocompletePopup(TApplication app) {
-        super(app, '', 20, 10, TWindow.NO_CLOSEBOX | TWindow.HIDEONCLOSE)
+        super(app, '', 20, 10, TWindow.NOCLOSEBOX | TWindow.HIDEONCLOSE)
         setHidden(true)
+    }
+
+    /**
+     * Set hidden state.
+     */
+    void setHidden(boolean hidden) {
+        if (hidden) {
+            hide()
+        } else {
+            show()
+        }
     }
 
     /**

@@ -37,7 +37,7 @@ class JexerSidebar extends TWindow {
     private TLabel separatorLabel
 
     JexerSidebar(TApplication app, String sessionId) {
-        super(app, '', WIDTH, 20, TWindow.NO_CLOSEBOX | TWindow.ABSOLUTEXY)
+        super(app, '', WIDTH, 20, TWindow.NOCLOSEBOX | TWindow.ABSOLUTEXY)
         this.sessionId = sessionId
         this.application = app
 

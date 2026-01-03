@@ -20,15 +20,15 @@ class JexerStatusBar extends TWindow {
     private TLabel scrollLabel
     private TLabel agentLabel
     private TLabel shortcutsLabel
-    private String currentModel = ""
-    private String currentDirectory = ""
-    private String currentAgent = "BUILD"
+    private String currentModel = ''
+    private String currentDirectory = ''
+    private String currentAgent = 'BUILD'
     private int scrollPosition = 0
     private int totalLines = 0
     private boolean showSidebarHint = false
 
     JexerStatusBar(TApplication app, int width) {
-        super(app, '', width, 1, TWindow.NO_CLOSEBOX | TWindow.ABSOLUTEXY)
+        super(app, '', width, 1, TWindow.NOCLOSEBOX | TWindow.ABSOLUTEXY)
         buildUI()
     }
 
@@ -36,7 +36,7 @@ class JexerStatusBar extends TWindow {
      * Build status bar UI.
      */
     private void buildUI() {
-        removeChildren()
+        getChildren().clear()
 
         // Calculate positions
         int x = 1
@@ -218,4 +218,5 @@ class JexerStatusBar extends TWindow {
     int getBarHeight() {
         return 1
     }
+
 }
