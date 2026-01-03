@@ -2,6 +2,7 @@ package tui.sidebar
 
 import com.googlecode.lanterna.gui2.*
 import com.googlecode.lanterna.TextColor
+import core.ModifiedFile
 import core.SessionStatsManager
 
 class ModifiedFilesSection extends Panel {
@@ -31,13 +32,6 @@ class ModifiedFilesSection extends Panel {
         
         def expandLabel = new Label(expanded ? "▼" : "▶")
         expandLabel.setForegroundColor(LanternaTheme.getTextColor())
-        expandLabel.addMouseListener(new MouseAdapter() {
-            void mouseClicked(MouseEvent e) {
-                if (e.getButton() == MouseButton.LEFT) {
-                    toggleExpanded()
-                }
-            }
-        })
         headerPanel.addComponent(expandLabel)
         
         headerLabel = new Label(" Modified Files")
@@ -125,17 +119,7 @@ class ModifiedFilesSection extends Panel {
         
         addComponent(filePanel)
     }
-            
-            if (file.deletions > 0) {
-                def delLabel = new Label(" -${file.deletions}")
-                delLabel.setForegroundColor(LanternaTheme.getDiffRemovedColor())
-                filePanel.addComponent(delLabel)
-            }
-        }
-        
-        addComponent(filePanel)
-    }
-    
+
     private String getShortFileName(String filePath) {
         // Extract just the filename, or truncate the full path
         def parts = filePath.split("/")

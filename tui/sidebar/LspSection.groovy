@@ -2,8 +2,7 @@ package tui.sidebar
 
 import com.googlecode.lanterna.gui2.*
 import com.googlecode.lanterna.TextColor
-import com.googlecode.lanterna.input.MouseButton
-import com.googlecode.lanterna.input.MouseAction
+import core.LspServerInfo
 import core.LspManager
 import core.LspManager as LspClientManager
 import core.SessionStatsManager
@@ -37,13 +36,6 @@ class LspSection extends Panel {
         
         toggleLabel = new Label(expanded ? "▼" : "▶")
         toggleLabel.setForegroundColor(LanternaTheme.getTextColor())
-        toggleLabel.addMouseListener(new MouseAdapter() {
-            void mouseClicked(MouseEvent e) {
-                if (e.getButton() == MouseButton.LEFT) {
-                    toggleExpanded()
-                }
-            }
-        })
         headerPanel.addComponent(toggleLabel)
         
         headerLabel = new Label(" LSP")
@@ -166,33 +158,7 @@ class LspSection extends Panel {
         
         addComponent(serverPanel)
     }
-        namePanel.addComponent(indicator)
-        
-        // Server name
-        def nameLabel = new Label(" ${lspInfo.lspId}")
-        nameLabel.setForegroundColor(LanternaTheme.getTextColor())
-        namePanel.addComponent(nameLabel)
-        
-        serverPanel.addComponent(namePanel)
-        
-        // Show root path if available
-        if (lspInfo.root) {
-            String shortRoot = shortenPath(lspInfo.root)
-            def rootLabel = new Label("    └─ ${shortRoot}")
-            rootLabel.setForegroundColor(LanternaTheme.getTextMutedColor())
-            serverPanel.addComponent(rootLabel)
-        }
-        
-        // Show error if present
-        if (lspInfo.error) {
-            def errorLabel = new Label("    └─ ${lspInfo.error}")
-            errorLabel.setForegroundColor(TextColor.ANSI.RED)
-            serverPanel.addComponent(errorLabel)
-        }
-        
-        addComponent(serverPanel)
-    }
-    
+
     private String shortenPath(String path) {
         // Shorten path to fit in sidebar (max 30 chars)
         if (path.length() <= 30) return path

@@ -18,6 +18,7 @@ import core.SessionStatsManager
 import core.TokenTracker
 import core.LspManager as SidebarLspManager
 import core.LSPManager as LspClientManager
+import core.LSPClient
 import models.ChatRequest
 import models.ChatResponse
 import models.Message
@@ -48,6 +49,7 @@ class LanternaTUI {
     private boolean sidebarEnabled = true
 
     private String currentModel
+    private String currentCwd
     private String providerId
     private String modelId
     private String sessionId
@@ -64,31 +66,31 @@ class LanternaTUI {
     LanternaTUI() throws Exception {
         this.currentCwd = System.getProperty('user.dir')
         this.agentRegistry = new AgentRegistry(AgentType.BUILD)
-        
+
         // Set up LSP tracking callback
         LspClientManager.instance.setOnClientCreated { String serverId, LSPClient client, String root ->
             // Register with sidebar LSP manager
             SidebarLspManager.instance.registerLsp(sessionId, serverId, client, root)
-            
+
             // Update diagnostics status based on initial diagnostics
             Thread.start {
                 try {
                     // Wait a bit for diagnostics to arrive
                     Thread.sleep(500)
-                    
+
                     int diagCount = client.getTotalDiagnosticCount()
                     if (diagCount > 0) {
                         SidebarLspManager.instance.updateLspStatus(
-                            sessionId, 
-                            serverId, 
-                            "connected", 
+                            sessionId,
+                            serverId,
+                            'connected',
                             "${diagCount} diagnostics"
                         )
                     }
                 } catch (Exception e) {
                 }
             }
-            
+
             // Refresh sidebar to show new LSP server
             refreshSidebar()
         }
@@ -120,19 +122,19 @@ class LanternaTUI {
                 .setMouseCaptureMode(MouseCaptureMode.CLICK_RELEASE_DRAG)
                 .createScreen()
             screen.startScreen()
-            
+
             textGUI = new MultiWindowTextGUI(screen)
             textGUI.setEOFWhenNoWindows(true)
-            
+
             setupMainWindow()
             setupUI()
-            
+
             // Initialize LSP tracking by touching a file
             initializeLspTracking()
-            
+
             // Start periodic sidebar refresh for LSP diagnostics
             startSidebarRefreshThread()
-            
+
             textGUI.waitForWindowToClose(mainWindow)
         } catch (Exception e) {
             System.err.println("TUI Error: ${e.message}")
@@ -144,17 +146,17 @@ class LanternaTUI {
             }
         }
     }
-    
+
     private void startSidebarRefreshThread() {
-        sidebarRefreshThread = Thread.start {
+        sidebarRefreshThread = new Thread({
             while (running) {
                 try {
                     Thread.sleep(2000) // Refresh every 2 seconds
-                    
+
                     if (sidebarPanel && sidebarPanel.getExpanded()) {
                         // Update LSP diagnostic counts and refresh sidebar
                         SidebarLspManager.instance.updateDiagnosticCounts(sessionId)
-                        
+
                         // Refresh sidebar on UI thread
                         if (textGUI && !textGUI.getGUIThread().isShutdown()) {
                             try {
@@ -162,7 +164,7 @@ class LanternaTUI {
                                     refreshSidebar()
                                 }
                             } catch (Exception e) {
-                                // Ignore if UI is shutting down
+                            // Ignore if UI is shutting down
                             }
                         }
                     }
@@ -174,10 +176,11 @@ class LanternaTUI {
                     System.err.println("Sidebar refresh error: ${e.message}")
                 }
             }
-        }
+        })
         sidebarRefreshThread.setDaemon(true)
+        sidebarRefreshThread.start()
     }
-    
+
     /**
      * Initialize LSP tracking by touching a file in the working directory.
      * This triggers LSP manager to spawn servers for the project.
@@ -186,19 +189,19 @@ class LanternaTUI {
         if (!LspClientManager.instance.isEnabled()) {
             return
         }
-        
+
         Thread.start {
             try {
                 // Touch a common file to trigger LSP server spawn
                 // Try glm.groovy first, then README.md
                 def filesToTouch = [
-                    "glm.groovy",
-                    "README.md",
-                    "package.json",
-                    "pom.xml",
-                    "build.gradle"
+                    'glm.groovy',
+                    'README.md',
+                    'package.json',
+                    'pom.xml',
+                    'build.gradle'
                 ]
-                
+
                 for (file in filesToTouch) {
                     def filePath = new File(currentCwd, file).absolutePath
                     if (new File(filePath).exists()) {
@@ -206,7 +209,7 @@ class LanternaTUI {
                             LspClientManager.instance.touchFile(filePath, false)
                             break // Only need to touch one file
                         } catch (Exception e) {
-                            // Try next file
+                        // Try next file
                         }
                     }
                 }
@@ -328,7 +331,7 @@ class LanternaTUI {
                 mainContainer.addComponent(sidebarPanel)
             }
         } catch (Exception e) {
-            // Ignore terminal size check errors
+        // Ignore terminal size check errors
         }
 
         mainWindow.setComponent(mainContainer)
@@ -393,7 +396,7 @@ class LanternaTUI {
     void toggleSidebar() {
         if (!sidebarPanel) return
         sidebarPanel.toggle()
-        activityLogPanel.appendStatus(sidebarPanel.getExpanded() ? "Sidebar shown" : "Sidebar hidden")
+        activityLogPanel.appendStatus(sidebarPanel.getExpanded() ? 'Sidebar shown' : 'Sidebar hidden')
     }
 
     void refreshSidebar() {
@@ -650,11 +653,11 @@ class LanternaTUI {
                     int inputTokens = response.usage.promptTokens ?: 0
                     int outputTokens = response.usage.completionTokens ?: 0
                     BigDecimal cost = response.usage.cost ?: 0.0000
-                    
+
                     // Update in-memory and database
                     TokenTracker.instance.recordTokens(sessionId, inputTokens, outputTokens, cost)
                     SessionStatsManager.instance.updateTokenCount(sessionId, inputTokens, outputTokens, cost)
-                    
+
                     // Refresh sidebar to show updated token count
                     refreshSidebar()
                 }

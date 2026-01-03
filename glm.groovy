@@ -36,6 +36,9 @@
 //SOURCES commands/AgentCommand.groovy
 //SOURCES commands/AuthCommand.groovy
 //SOURCES commands/SessionCommand.groovy
+//SOURCES commands/ModelsCommand.groovy
+//SOURCES commands/PlanCommand.groovy
+//SOURCES commands/InitCommand.groovy
 //SOURCES models/WebSearchResponse.groovy
 //SOURCES core/WebSearchClient.groovy
 //SOURCES core/GlmClient.groovy
@@ -48,6 +51,29 @@
 //SOURCES models/ChatResponse.groovy
 //SOURCES models/Message.groovy
 //SOURCES core/Auth.groovy
+//SOURCES core/AgentRegistry.groovy
+//SOURCES core/AgentConfig.groovy
+//SOURCES core/AgentType.groovy
+//SOURCES core/Instructions.groovy
+//SOURCES core/SessionStats.groovy
+//SOURCES core/SessionStatsManager.groovy
+//SOURCES core/LspManager.groovy
+//SOURCES core/LSPClient.groovy
+//SOURCES core/ModelCatalog.groovy
+//SOURCES core/TokenTracker.groovy
+//SOURCES core/Subagent.groovy
+//SOURCES core/SubagentPool.groovy
+//SOURCES core/LSPManager.groovy
+//SOURCES tools/ReadFileTool.groovy
+//SOURCES tools/WriteFileTool.groovy
+//SOURCES tools/ListFilesTool.groovy
+//SOURCES tools/FetchUrlTool.groovy
+//SOURCES tools/CodeSearchTool.groovy
+//SOURCES tools/GrepTool.groovy
+//SOURCES tools/GlobTool.groovy
+//SOURCES tools/BatchTool.groovy
+//SOURCES tools/Tool.groovy
+//SOURCES tools/TaskTool.groovy
 
 // RAG sources
 //SOURCES rag/CodebaseLoader.groovy
@@ -85,12 +111,22 @@
 //SOURCES tui/InteractivePrompt.groovy
 //SOURCES tui/ProgressIndicator.groovy
 //SOURCES tui/OutputFormatter.groovy
-//SOURCES tui/JexerTUI.groovy
+// //SOURCES tui/JexerTUIEnhanced.groovy
+//SOURCES tui/JexerTheme.groovy
 //SOURCES tui/AutocompleteItem.groovy
 //SOURCES tui/AutocompleteField.groovy
 //SOURCES tui/AutocompletePopup.groovy
 //SOURCES tui/FileProvider.groovy
 //SOURCES tui/CommandProvider.groovy
+//SOURCES tui/widgets/JexerActivityLog.groovy
+//SOURCES tui/widgets/JexerCommandInput.groovy
+//SOURCES tui/widgets/JexerAutocompletePopup.groovy
+//SOURCES tui/widgets/JexerStatusBar.groovy
+// //SOURCES tui/widgets/JexerSidebar.groovy
+// //SOURCES tui/sidebar/JexerSessionInfoSection.groovy
+// //SOURCES tui/sidebar/JexerTokenSection.groovy
+// //SOURCES tui/sidebar/JexerLspSection.groovy
+// //SOURCES tui/sidebar/JexerModifiedFilesSection.groovy
 
 // TUI sources (Lanterna based)
 //SOURCES tui/LanternaTUI.groovy
@@ -98,8 +134,13 @@
 //SOURCES tui/ActivityLogPanel.groovy
 //SOURCES tui/CommandInputPanel.groovy
 //SOURCES tui/LanternaAutocompletePopup.groovy
-
-// LSP sources
+//SOURCES tui/SidebarPanel.groovy
+//SOURCES tui/sidebar/SessionInfoSection.groovy
+// //SOURCES tui/sidebar/TokenSection.groovy
+// //SOURCES tui/sidebar/LspSection.groovy
+// //SOURCES tui/sidebar/ModifiedFilesSection.groovy
+//
+//// LSP sources
 //SOURCES models/Diagnostic.groovy
 //SOURCES core/RootDetector.groovy
 //SOURCES core/JsonRpcHandler.groovy
