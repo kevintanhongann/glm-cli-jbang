@@ -5,6 +5,7 @@ import models.ChatResponse
 import models.Message
 import tools.Tool
 import tools.TaskTool
+import tools.BatchTool
 import com.fasterxml.jackson.databind.ObjectMapper
 
 import tui.AnsiColors
@@ -48,6 +49,9 @@ class Agent {
     private final SessionManager sessionManager
     private final MessageStore messageStore
     private final String sessionId
+    private final ParallelExecutor parallelExecutor
+    private final List<ToolExecutionStats> executionStats = []
+    private BatchTool batchTool
 
     Agent(String apiKey, String model, String sessionId = null) {
         this.client = new GlmClient(apiKey)
@@ -58,8 +62,12 @@ class Agent {
         this.messageStore = new MessageStore()
 
         AnsiColors.install()
+        this.parallelExecutor = new ParallelExecutor(config.toolHeuristics?.maxParallelTools ?: 10)
 
         registerTool(new TaskTool(subagentPool))
+
+        // BatchTool needs access to all registered tools, so we register it after other tools
+        // It will be properly initialized when tools are fully registered
 
         // Create or resume session
         if (sessionId) {
@@ -78,6 +86,66 @@ class Agent {
 
     void shutdown() {
         subagentPool?.shutdown()
+        parallelExecutor?.shutdown()
+        batchTool?.shutdown()
+    }
+
+    /**
+     * Initialize and register the BatchTool.
+     * Should be called after all other tools are registered.
+     */
+    void initializeBatchTool() {
+        if (batchTool == null) {
+            batchTool = new BatchTool(tools)
+            registerTool(batchTool)
+        }
+    }
+
+    /**
+     * Track tool execution statistics for optimization.
+     */
+    void trackExecution(String toolName, long duration, boolean success) {
+        def stats = executionStats.find { it.toolName == toolName }
+
+        if (stats == null) {
+            stats = new ToolExecutionStats(toolName: toolName)
+            executionStats.add(stats)
+        }
+
+        stats.count++
+        stats.totalDuration += duration
+        if (success) stats.successCount++
+    }
+
+    /**
+     * Get execution statistics for a specific tool.
+     */
+    ToolExecutionStats getToolStats(String toolName) {
+        return executionStats.find { it.toolName == toolName }
+    }
+
+    /**
+     * Get all execution statistics.
+     */
+    List<ToolExecutionStats> getAllStats() {
+        return executionStats.asImmutable()
+    }
+
+    static class ToolExecutionStats {
+
+        String toolName
+        int count = 0
+        long totalDuration = 0
+        int successCount = 0
+
+        double getAverageDuration() {
+            return count > 0 ? totalDuration / count : 0
+        }
+
+        double getSuccessRate() {
+            return count > 0 ? (successCount / count) * 100 : 0
+        }
+
     }
 
     void registerTool(Tool tool) {

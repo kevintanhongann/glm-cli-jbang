@@ -6,6 +6,7 @@ import groovy.sql.Sql
 @Singleton(strict=false)
 class TokenTracker {
     private Sql database
+    private Map<String, TokenStats> inMemoryStats = [:]
 
     TokenTracker() {
         this.database = SessionManager.instance.getDatabase()
@@ -14,6 +15,15 @@ class TokenTracker {
     void recordTokens(String sessionId, int inputTokens, int outputTokens, BigDecimal cost = 0.0000) {
         def totalTokens = inputTokens + outputTokens
 
+        // Update in-memory stats
+        if (!inMemoryStats[sessionId]) {
+            inMemoryStats[sessionId] = new TokenStats(sessionId: sessionId)
+        }
+        inMemoryStats[sessionId].totalTokens += totalTokens
+        inMemoryStats[sessionId].inputTokens += inputTokens
+        inMemoryStats[sessionId].totalCost += cost
+
+        // Update database
         def existing = database.firstRow(
             "SELECT * FROM token_stats WHERE session_id = ?",
             [sessionId]
@@ -36,6 +46,13 @@ class TokenTracker {
                 [sessionId, totalTokens, cost]
             )
         }
+    }
+
+    /**
+     * Get in-memory token stats for a session (faster than DB access)
+     */
+    TokenStats getInMemoryStats(String sessionId) {
+        return inMemoryStats[sessionId]
     }
 
     TokenStats getTokenStats(String sessionId) {

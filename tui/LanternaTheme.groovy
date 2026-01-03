@@ -25,6 +25,10 @@ class LanternaTheme {
         return TextColor.ANSI.WHITE
     }
     
+    static TextColor getTextColor() {
+        return TextColor.ANSI.WHITE
+    }
+    
     static TextColor getAccentColor() {
         return TextColor.ANSI.CYAN
     }
@@ -55,5 +59,43 @@ class LanternaTheme {
 
     static TextColor getAgentPlanColor() {
         return TextColor.ANSI.YELLOW
+    }
+    
+    // Sidebar colors
+    static TextColor getTextMutedColor() {
+        return new TextColor.RGB(128, 128, 128)
+    }
+    
+    static TextColor getSidebarBackgroundColor() {
+        return new TextColor.RGB(30, 30, 50)
+    }
+    
+    static TextColor getSidebarBorderColor() {
+        return new TextColor.RGB(70, 70, 90)
+    }
+    
+    static TextColor getSuccessColor() {
+        return TextColor.ANSI.GREEN
+    }
+    
+    static TextColor getDiffAddedColor() {
+        return new TextColor.RGB(76, 175, 80)
+    }
+    
+    static TextColor getDiffRemovedColor() {
+        return new TextColor.RGB(244, 67, 54)
+    }
+    
+    // Enhanced colors
+    static TextColor getSidebarHeaderColor() {
+        return new TextColor.RGB(100, 100, 120)
+    }
+    
+    static TextColor getSidebarTreeColor() {
+        return new TextColor.RGB(90, 90, 110)
+    }
+    
+    static TextColor getSidebarHighlightColor() {
+        return new TextColor.RGB(60, 60, 80)
     }
 }

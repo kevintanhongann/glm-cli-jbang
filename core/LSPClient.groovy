@@ -14,10 +14,12 @@ import java.util.concurrent.TimeUnit
 class LSPClient {
     private final JsonRpcHandler rpc
     private final String serverName
+    private String rootPath
     private final Map<String, List<Diagnostic>> diagnostics = new ConcurrentHashMap<>()
     private final Map<String, Integer> fileVersions = new ConcurrentHashMap<>()
     private volatile CountDownLatch diagnosticLatch
     private volatile boolean initialized = false
+    private volatile String status = "connected"
     
     LSPClient(JsonRpcHandler rpc, String serverName) {
         this.rpc = rpc
@@ -32,6 +34,59 @@ class LSPClient {
     }
     
     /**
+     * Get the project root path for this LSP client.
+     */
+    String getRootPath() {
+        return rootPath
+    }
+    
+    /**
+     * Get the current status of this LSP client.
+     */
+    String getStatus() {
+        return status
+    }
+    
+    /**
+     * Get the total number of diagnostics across all files.
+     */
+    int getTotalDiagnosticCount() {
+        int count = 0
+        diagnostics.values().each { diags ->
+            count += diags.size()
+        }
+        return count
+    }
+    
+    /**
+     * Get the number of files with diagnostics.
+     */
+    int getFileCountWithDiagnostics() {
+        return diagnostics.size()
+    }
+    
+    /**
+     * Get a summary of diagnostics (counts by severity).
+     */
+    Map<String, Integer> getDiagnosticSummary() {
+        Map<String, Integer> summary = [
+            error: 0,
+            warning: 0,
+            info: 0
+        ]
+        
+        diagnostics.values().each { diags ->
+            diags.each { diag ->
+                if (diag.severity == 1) summary.error++
+                else if (diag.severity == 2) summary.warning++
+                else summary.info++
+            }
+        }
+        
+        return summary
+    }
+    
+    /**
      * Initialize the LSP connection.
      * @param rootPath Project root path
      * @return Server capabilities
@@ -39,38 +94,47 @@ class LSPClient {
     Map initialize(String rootPath) {
         if (initialized) return [:]
         
-        rpc.startMessageLoop()
+        this.rootPath = rootPath
+        this.status = "initializing"
         
-        def result = rpc.sendRequest("initialize", [
-            processId: ProcessHandle.current().pid(),
-            rootUri: "file://${rootPath}",
-            rootPath: rootPath,
-            capabilities: [
-                textDocument: [
-                    synchronization: [
-                        dynamicRegistration: false,
-                        willSave: false,
-                        willSaveWaitUntil: false,
-                        didSave: true
+        try {
+            rpc.startMessageLoop()
+            
+            def result = rpc.sendRequest("initialize", [
+                processId: ProcessHandle.current().pid(),
+                rootUri: "file://${rootPath}",
+                rootPath: rootPath,
+                capabilities: [
+                    textDocument: [
+                        synchronization: [
+                            dynamicRegistration: false,
+                            willSave: false,
+                            willSaveWaitUntil: false,
+                            didSave: true
+                        ],
+                        publishDiagnostics: [
+                            relatedInformation: true
+                        ]
                     ],
-                    publishDiagnostics: [
-                        relatedInformation: true
+                    workspace: [
+                        workspaceFolders: true
                     ]
                 ],
-                workspace: [
-                    workspaceFolders: true
+                workspaceFolders: [
+                    [uri: "file://${rootPath}", name: new File(rootPath).name]
                 ]
-            ],
-            workspaceFolders: [
-                [uri: "file://${rootPath}", name: new File(rootPath).name]
-            ]
-        ], 10000) as Map
-        
-        // Send initialized notification
-        rpc.sendNotification("initialized", [:])
-        initialized = true
-        
-        return result
+            ], 10000) as Map
+            
+            // Send initialized notification
+            rpc.sendNotification("initialized", [:])
+            initialized = true
+            this.status = "connected"
+            
+            return result
+        } catch (Exception e) {
+            this.status = "error"
+            throw e
+        }
     }
     
     /**
@@ -221,6 +285,7 @@ class LSPClient {
      */
     void shutdown() {
         try {
+            status = "disconnected"
             rpc.sendRequest("shutdown", [:], 2000)
             rpc.sendNotification("exit", [:])
         } catch (Exception ignored) {}

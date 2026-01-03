@@ -2,13 +2,19 @@ package tools
 
 import core.LSPManager
 import core.DiagnosticFormatter
+import core.SessionStatsManager
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
 
 class WriteFileTool implements Tool {
-
+    private String currentSessionId
+    
+    void setSessionId(String sessionId) {
+        this.currentSessionId = sessionId
+    }
+    
     @Override
     String getName() { 'write_file' }
 
@@ -63,7 +69,26 @@ Write or create a file with automatic diff preview and user confirmation.
         String content = args.get('content')
         Path path = Paths.get(pathStr).normalize()
         String absolutePath = path.toAbsolutePath().toString()
-
+        
+        // Calculate diff stats if file exists
+        int additions = 0
+        int deletions = 0
+        if (Files.exists(path)) {
+            def oldContent = path.toFile().text
+            def oldLines = oldContent.split('\n')
+            def newLines = content.split('\n')
+            
+            // Simple diff calculation (not perfect, but good enough for stats)
+            additions = newLines.size() - oldLines.size()
+            if (additions < 0) {
+                additions = 0
+                deletions = -additions
+            }
+        } else {
+            // New file, all lines are additions
+            additions = content.split('\n').size()
+        }
+        
         try {
             if (path.getParent() != null) {
                 Files.createDirectories(path.getParent())
@@ -72,7 +97,21 @@ Write or create a file with automatic diff preview and user confirmation.
 
             def result = new StringBuilder()
             result.append("Successfully wrote ${content.length()} bytes to ${pathStr}")
-
+            
+            // Track modified file in session stats
+            if (currentSessionId && (additions > 0 || deletions > 0)) {
+                try {
+                    SessionStatsManager.instance.recordModifiedFile(
+                        currentSessionId,
+                        pathStr,
+                        additions,
+                        deletions
+                    )
+                } catch (Exception e) {
+                    // Don't fail the write if stats update fails
+                }
+            }
+            
             // Get LSP diagnostics if available
             try {
                 def lsp = LSPManager.instance

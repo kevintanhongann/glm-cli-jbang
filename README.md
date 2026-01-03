@@ -408,4 +408,7 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ---
 
-**Join our community** | [GitHub Issues](https://github.com/yourusername/glm-cli-jbang/issues) | [Discussions](https://github.com/yourusername/glm-cli-jbang/discussions)
+**Join our community** | [Discussions](https://discord.gg/rJfNM4bUx6)
+
+
+🚀 You’ve been invited to join the GLM Coding Plan! Enjoy full support for Claude Code, Cline, and 10+ top coding tools — starting at just $3/month. Subscribe now and grab the limited-time deal! Link： https://z.ai/subscribe?ic=CQBKX9KCLF 

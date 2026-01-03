@@ -2,7 +2,7 @@
 //DEPS dev.langchain4j:langchain4j:1.10.0
 //DEPS ./jexer-2.0.0-full.jar
 //DEPS info.picocli:picocli:4.7.7
-//DEPS info.picocli:picocli-groovy:4.7.7   
+//DEPS info.picocli:picocli-groovy:4.7.7
 //DEPS dev.langchain4j:langchain4j-zhipu-ai:0.36.2
 
 // Groovy JSON module (required for JsonSlurper/JsonOutput in Groovy 4.x)
@@ -65,12 +65,15 @@
 //SOURCES tools/CodeSearchTool.groovy
 //SOURCES tools/GrepTool.groovy
 //SOURCES tools/GlobTool.groovy
+//SOURCES tools/BatchTool.groovy
 
 // Agent source
 //SOURCES core/Agent.groovy
 //SOURCES core/SessionManager.groovy
 //SOURCES core/MessageStore.groovy
 //SOURCES core/TokenTracker.groovy
+//SOURCES core/ParallelExecutor.groovy
+//SOURCES core/ParallelProgressMonitor.groovy
 
 // Model sources
 //SOURCES models/Session.groovy

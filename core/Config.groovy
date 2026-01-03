@@ -31,6 +31,9 @@ class Config {
     @JsonProperty('tool_heuristics')
     ToolHeuristicsConfig toolHeuristics = new ToolHeuristicsConfig()
 
+    @JsonProperty('parallel_execution')
+    ParallelExecutionConfig parallelExecution = new ParallelExecutionConfig()
+
     @JsonProperty('provider')
     Map<String, ProviderConfig> provider = [:]
 
@@ -122,6 +125,18 @@ class Config {
         Integer maxParallelTools = 10
         @JsonProperty('suggest_explore_agent')
         Boolean suggestExploreAgent = true
+
+    }
+
+    static class ParallelExecutionConfig {
+
+        Boolean enabled = true
+        @JsonProperty('max_parallel_tools')
+        Integer maxParallelTools = 10
+        @JsonProperty('thread_pool_size')
+        Integer threadPoolSize = 10
+        @JsonProperty('progress_display')
+        Boolean progressDisplay = true
 
     }
 

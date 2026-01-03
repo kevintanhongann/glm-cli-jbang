@@ -15,6 +15,9 @@ class LSPManager {
     private final LSPServerRegistry registry = new LSPServerRegistry()
     private LSPConfig config = LSPConfig.load()
     
+    // Callback for LSP client lifecycle events
+    private Closure onClientCreated = null
+    
     /**
      * Get or create an LSP client for the given file.
      * @param filePath Absolute file path
@@ -110,7 +113,24 @@ class LSPManager {
         // Initialize the client
         client.initialize(root)
         
+        // Notify callback if set
+        if (onClientCreated != null) {
+            try {
+                onClientCreated.call(serverConfig.id, client, root)
+            } catch (Exception e) {
+                System.err.println("LSP callback error: ${e.message}")
+            }
+        }
+        
         return client
+    }
+    
+    /**
+     * Set callback to be notified when new LSP clients are created.
+     * Useful for tracking, logging, or sidebar updates.
+     */
+    void setOnClientCreated(Closure callback) {
+        this.onClientCreated = callback
     }
     
     /**
