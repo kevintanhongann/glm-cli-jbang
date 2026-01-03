@@ -33,6 +33,7 @@ class CommandInputPanel {
 
         LanternaTheme.applyToTextBox(inputBox)
 
+        setupAutocompleteCallbacks()
         setupKeyBindings()
     }
 
@@ -40,27 +41,43 @@ class CommandInputPanel {
         return inputBox
     }
 
+    private void setupAutocompleteCallbacks() {
+        autocompletePopup.setOnSelection({
+            AutocompleteItem selected = autocompletePopup.getSelectedItem()
+            if (selected) {
+                insertAutocompleteSelection(selected)
+            }
+        } as Runnable)
+    }
+
     private void setupKeyBindings() {
         inputBox.setInputFilter((textBox, key) -> {
             KeyType keyType = key.getKeyType()
 
-            // Handle popup navigation when visible
+            // When popup is visible, let it handle most keys
             if (autocompletePopup.isVisible()) {
-                if (keyType == KeyType.ArrowUp) {
-                    autocompletePopup.selectPrevious()
-                    return false
+                if (keyType == KeyType.ArrowUp || keyType == KeyType.ArrowDown) {
+                    return false  // Let popup handle navigation
                 }
-                if (keyType == KeyType.ArrowDown) {
-                    autocompletePopup.selectNext()
+                if (keyType == KeyType.Escape) {
+                    autocompletePopup.hide()
                     return false
                 }
                 if (keyType == KeyType.Enter) {
                     AutocompleteItem selected = autocompletePopup.getSelectedItem()
                     if (selected) {
-                        insertAutocompleteSelection(selected)
-                        autocompletePopup.hide()
+                        // Build the completed text directly
+                        String currentText = inputBox.getText()
+                        int cursorPos = inputBox.getCaretPosition().getColumn()
+                        String before = triggerPosition > 0 ? currentText.substring(0, triggerPosition) : ''
+                        String after = cursorPos < currentText.length() ? currentText.substring(cursorPos) : ''
+                        String completedText = (before + triggerType + selected.value + ' ' + after).trim()
+                        
+                        // Set and submit directly
+                        inputBox.setText(completedText)
+                        submitInputDirect(completedText)
                     } else {
-                        submitInput()
+                        autocompletePopup.hide()
                     }
                     return false
                 }
@@ -68,17 +85,51 @@ class CommandInputPanel {
                     AutocompleteItem selected = autocompletePopup.getSelectedItem()
                     if (selected) {
                         insertAutocompleteSelection(selected)
-                        autocompletePopup.hide()
                     }
-                    return false
-                }
-                if (keyType == KeyType.Escape) {
                     autocompletePopup.hide()
                     return false
                 }
+                if (keyType == KeyType.Character) {
+                    // Pre-calculate filter by including the new character
+                    String newChar = key.getCharacter() as String
+                    String currentText = inputBox.getText()
+                    int cursorPos = inputBox.getCaretPosition().getColumn()
+
+                    // Insert the new character at cursor position
+                    String newText = new StringBuilder(currentText)
+                        .insert(cursorPos, newChar)
+                        .toString()
+
+                    // Calculate filter based on new text
+                    if (triggerPosition >= 0) {
+                        int newCursorPos = cursorPos + 1
+
+                        if (newCursorPos <= triggerPosition || newCursorPos > newText.length()) {
+                            autocompletePopup.hide()
+                        } else {
+                            String filter = newText.substring(triggerPosition + 1, newCursorPos)
+
+                            if (filter.contains(' ')) {
+                                autocompletePopup.hide()
+                            } else {
+                                autocompletePopup.filter(filter)
+
+                                if (autocompletePopup.isEmpty()) {
+                                    autocompletePopup.hide()
+                                }
+                            }
+                        }
+                    }
+
+                    return true
+                }
+                if (keyType == KeyType.Backspace) {
+                    // Handle backspace: might close popup
+                    return handleBackspace()
+                }
             }
 
-            // Regular Enter - submit input
+            // Regular Enter - submit input (only when popup not visible)
             if (keyType == KeyType.Enter) {
                 submitInput()
                 return false
@@ -90,6 +141,16 @@ class CommandInputPanel {
                     tui.cycleAgent(-1)  // Reverse cycling
                 } else {
                     tui.cycleAgent(1)   // Forward cycling
+                }
+                return false
+            }
+
+            // Ctrl+M to show model selection dialog
+            if (!autocompletePopup.isVisible() &&
+                key.isCtrlDown() && keyType == KeyType.Character && key.getCharacter() == 'm') {
+                // Defer dialog creation to avoid blocking in input filter context
+                Thread.start {
+                    tui.showModelSelectionDialog()
                 }
                 return false
             }
@@ -113,7 +174,7 @@ class CommandInputPanel {
 
             // Space handling - close popup
             if (!key.isAltDown() && !key.isCtrlDown() &&
-                keyType == KeyType.Character && key.getCharacter() == (char)' ') {
+                keyType == KeyType.Character && key.getCharacter() == ' ') {
                 autocompletePopup.hide()
                 return true
             }
@@ -135,11 +196,6 @@ class CommandInputPanel {
                 inputBox.setText("")
                 autocompletePopup.hide()
                 return false
-            }
-
-            // Regular typing - filter popup if open
-            if (autocompletePopup.isVisible() && keyType == KeyType.Character) {
-                updateFilter()
             }
 
             return true
@@ -275,6 +331,16 @@ class CommandInputPanel {
     private void submitInput() {
         String input = inputBox.getText().trim()
 
+        if (!input.isEmpty()) {
+            history.add(input)
+            historyIndex = history.size()
+            inputBox.setText("")
+            autocompletePopup.hide()
+            tui.processUserInput(input, extractMentions())
+        }
+    }
+
+    private void submitInputDirect(String input) {
         if (!input.isEmpty()) {
             history.add(input)
             historyIndex = history.size()

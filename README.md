@@ -5,7 +5,7 @@
 ![Groovy](https://img.shields.io/badge/Groovy-4.x-orange?style=flat-square)
 ![JBang](https://img.shields.io/badge/JBang-compatible-red?style=flat-square)
 
-A native-performance AI coding agent CLI for Linux, macOS, and Windows, powered by Z.ai's GLM-4 models and built with JBang and Groovy.
+A native-performance AI coding agent CLI for Linux, macOS, and Windows, powered by multiple AI providers including Z.ai's GLM-4 models and OpenCode Zen's curated models, built with JBang and Groovy.
 
 ![Demo](https://img.shields.io/badge/demo-available-lightgrey?style=flat-square)
 
@@ -17,14 +17,15 @@ A native-performance AI coding agent CLI for Linux, macOS, and Windows, powered 
 
 | Feature | Description |
 |---------|-------------|
-| **Chat** | Interactive conversation with GLM-4 models (`glm-4-flash`, `glm-4`, `glm-4-plus`, `glm-4.5`) |
+| **Chat** | Interactive conversation with multiple AI providers and models |
 | **Agent** | Autonomous task execution with ReAct loop for reading/writing files |
 | **Web Search** | Integrated web search with real-time information retrieval |
 | **Tools** | Built-in tools (`read_file`, `write_file`, `list_files`, `web_search`) with safety checks |
 | **Streaming** | Real-time response streaming using Server-Sent Events (SSE) |
 | **Diff Preview** | See file changes before applying with diff visualization |
 | **Configurable** | TOML-based configuration for API keys, defaults, and behavior |
-| **JWT Auth** | Secure API authentication with automatic token caching |
+| **Multi-Provider** | Support for Zai/Zhipu AI and OpenCode Zen providers |
+| **Model Selection** | Choose from curated models including Big Pickle, GLM-4.7-free, and more |
 
 ## Prerequisites
 
@@ -55,8 +56,8 @@ chmod +x glm.groovy
 jbang app install --name glm glm.groovy
 
 # Now you can use it from anywhere
-glm chat "Explain this code"
-glm agent "Refactor the User class"
+glm chat -m opencode/big-pickle "Explain this code"
+glm agent -m zai/glm-4.7 "Refactor User class"
 ```
 
 ### Verify Installation
@@ -73,27 +74,52 @@ The CLI looks for a configuration file at `~/.glm/config.toml`.
 ### Configuration File Example
 
 ```toml
-[api]
-key = "your-api-key-here"
-base_url = "https://open.bigmodel.cn/api/paas/v4/"
-
 [behavior]
-default_model = "glm-4-flash"
+default_model = "opencode/big-pickle"  # Format: provider/model-id
 safety_mode = "ask" # 'ask' or 'always_allow'
 language = "auto"    # 'auto', 'en', 'zh'
 ```
 
-### Environment Variables
+### Available Providers
 
-Alternatively, set the `ZAI_API_KEY` environment variable:
+#### OpenCode Zen (Default)
+- **Models**: Big Pickle, GLM-4.7-free, GLM-4.6, Kimi K2, Qwen3 Coder, Grok Code, MiniMax M2.1
+- **Auth**: `glm auth login opencode`
+- **Get API Key**: https://opencode.ai/auth
+- **Free models**: Big Pickle, GLM-4.7-free, Grok Code, MiniMax M2.1
+
+#### Zai/Zhipu AI
+- **Models**: GLM-4-flash, GLM-4.7
+- **Auth**: `glm auth login zai`
+- **Get API Key**: https://open.bigmodel.cn/usercenter/apikeys
+
+### List Available Models
 
 ```bash
-# For current session
-export ZAI_API_KEY=your.key.here
+# List all models
+glm models
 
-# Add to ~/.bashrc or ~/.zshrc for persistence
-echo 'export ZAI_API_KEY=your.key.here' >> ~/.bashrc
+# List models for a specific provider
+glm models opencode
+glm models zai
+
+# Show detailed information
+glm models --verbose
+
+# Refresh model catalog
+glm models --refresh
 ```
+
+### Environment Variables
+
+Note: Provider-specific authentication is now managed via `glm auth login`. Environment variables are no longer the recommended method.
+
+### Configuration Priority
+
+1. Command-line flags (highest priority)
+2. Provider credentials from `glm auth login`
+3. `~/.glm/config.toml`
+4. Default values (lowest priority)
 
 ### Configuration Priority
 
@@ -103,6 +129,24 @@ echo 'export ZAI_API_KEY=your.key.here' >> ~/.bashrc
 4. Default values (lowest priority)
 
 ## Usage
+
+### Authentication
+
+Login to a provider:
+
+```bash
+# Login to OpenCode Zen (recommended, includes free models)
+glm auth login opencode
+
+# Login to Zai/Zhipu AI
+glm auth login zai
+
+# List configured credentials
+glm auth list
+
+# Logout from a provider
+glm auth logout opencode
+```
 
 ### Chat
 
@@ -121,6 +165,15 @@ glm chat "Explain this project structure"
 With a specific model:
 
 ```bash
+# Use OpenCode Zen's Big Pickle (free, stealth model)
+glm chat -m opencode/big-pickle "Write a sorting algorithm"
+
+# Use Zai's GLM-4.7
+glm chat -m zai/glm-4.7 "Refactor this code"
+
+# Use OpenCode Zen's GLM-4.7-free (free model)
+glm chat -m opencode/glm-4.7-free "Help me debug"
+```
 glm chat --model glm-4 "Analyze this code for security issues"
 ```
 

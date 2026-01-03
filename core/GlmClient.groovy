@@ -12,19 +12,22 @@ import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 
 class GlmClient {
-    private static final String BASE_URL = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
     private static final long EXPIRATION_SECONDS = 3600 // 1 hour
     private static final long CACHE_TTL_SECONDS = 3500 // Slightly less than expiration
 
     private final String apiKey
+    private final String baseUrl
+    private final String authType
     private final HttpClient client
     private final ObjectMapper mapper
     
     private String cachedToken
     private long tokenExpiryTime = 0
 
-    GlmClient(String apiKey) {
+    GlmClient(String apiKey, String baseUrl = null, String authType = "jwt") {
         this.apiKey = apiKey
+        this.baseUrl = baseUrl
+        this.authType = authType
         this.client = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .build()
@@ -33,6 +36,28 @@ class GlmClient {
 
     GlmClient() {
         this.apiKey = loadApiKey()
+        this.baseUrl = loadBaseUrl()
+        this.authType = loadAuthType()
+        this.client = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(10))
+            .build()
+        this.mapper = new ObjectMapper()
+    }
+
+    GlmClient(String providerId) {
+        def providerInfo = ModelCatalog.getProvider(providerId)
+        if (!providerInfo) {
+            throw new IllegalArgumentException("Unknown provider: ${providerId}")
+        }
+
+        def credential = Auth.get(providerId)
+        if (credential == null) {
+            throw new IllegalStateException("No credential found for provider '${providerId}'. Use 'glm auth login ${providerId}' to set up authentication")
+        }
+
+        this.apiKey = credential.key
+        this.baseUrl = providerInfo.endpoint
+        this.authType = providerInfo.authType ?: "bearer"
         this.client = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .build()
@@ -40,6 +65,12 @@ class GlmClient {
     }
 
     private static String loadApiKey() {
+        def config = Config.load()
+        
+        if (config.api?.key) {
+            return config.api.key
+        }
+
         def credential = Auth.get("zai")
         if (credential != null) {
             return credential.key
@@ -53,7 +84,35 @@ class GlmClient {
         throw new IllegalStateException("No API key found. Use 'glm auth login' to set up authentication or set ZAI_API_KEY environment variable")
     }
 
-    private synchronized String getToken() {
+    private static String loadBaseUrl() {
+        def config = Config.load()
+        
+        if (config.api?.baseUrl) {
+            return config.api.baseUrl
+        }
+
+        return "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+    }
+
+    private static String loadAuthType() {
+        def config = Config.load()
+        
+        if (config.api?.baseUrl) {
+            return "bearer"
+        }
+
+        return "jwt"
+    }
+
+    private synchronized String getAuthToken() {
+        if (authType == "jwt") {
+            return getJwtToken()
+        } else {
+            return apiKey
+        }
+    }
+
+    private synchronized String getJwtToken() {
         long now = System.currentTimeMillis()
         if (cachedToken != null && now < tokenExpiryTime) {
             return cachedToken
@@ -61,7 +120,7 @@ class GlmClient {
 
         String[] parts = apiKey.split("\\.")
         if (parts.length != 2) {
-            throw new IllegalArgumentException("Invalid API Key format")
+            throw new IllegalArgumentException("Invalid API Key format for JWT auth")
         }
 
         String id = parts[0]
@@ -87,10 +146,10 @@ class GlmClient {
     String sendMessage(ChatRequest request) {
         request.stream = false
         String jsonBody = mapper.writeValueAsString(request)
-        String token = getToken()
+        String token = getAuthToken()
 
         HttpRequest httpRequest = HttpRequest.newBuilder()
-            .uri(URI.create(BASE_URL))
+            .uri(URI.create(baseUrl))
             .header("Authorization", "Bearer " + token)
             .header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
@@ -108,10 +167,10 @@ class GlmClient {
     void streamMessage(ChatRequest request, Closure onChunk) {
         request.stream = true
         String jsonBody = mapper.writeValueAsString(request)
-        String token = getToken()
+        String token = getAuthToken()
 
         HttpRequest httpRequest = HttpRequest.newBuilder()
-            .uri(URI.create(BASE_URL))
+            .uri(URI.create(baseUrl))
             .header("Authorization", "Bearer " + token)
             .header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(jsonBody))

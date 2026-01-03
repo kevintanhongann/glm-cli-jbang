@@ -3,6 +3,7 @@ package tui
 import core.Auth
 import core.GlmClient
 import core.Config
+import core.ModelCatalog
 import models.ChatRequest
 import models.ChatResponse
 import models.Message
@@ -33,11 +34,13 @@ import static jexer.TKeypress.*
 
 /**
  * Jexer-based TUI with dark OpenCode-style theme.
- * Provides a Turbo Vision-style UI for the GLM CLI.
+ * Provides a Turbo Vision-style UI for GLM CLI.
  */
 class JexerTUI extends TApplication {
 
     private String currentModel
+    private String providerId
+    private String modelId
     private String currentCwd
     private String apiKey
     private Config config
@@ -126,10 +129,21 @@ class JexerTUI extends TApplication {
     }
 
     /**
-     * Start the TUI with the given model and working directory.
+     * Start TUI with given model and working directory.
      */
-    void start(String model = 'glm-4.7', String cwd = null) {
+    void start(String model = 'opencode/big-pickle', String cwd = null) {
         this.currentModel = model
+        
+        def parts = model.split('/', 2)
+        if (parts.length == 2) {
+            this.providerId = parts[0]
+            this.modelId = parts[1]
+        } else {
+            System.err.println("Warning: Model format should be 'provider/model-id'. Using default provider 'opencode'.")
+            this.providerId = "opencode"
+            this.modelId = parts[0]
+        }
+        
         this.currentCwd = cwd ?: System.getProperty('user.dir')
 
         // Initialize client
@@ -150,22 +164,30 @@ class JexerTUI extends TApplication {
     private boolean initClient() {
         config = Config.load()
 
-        // Get API key
-        apiKey = System.getenv('ZAI_API_KEY')
-        if (!apiKey) {
-            def authCredential = Auth.get('zai')
-            apiKey = authCredential?.key
-        }
-        if (!apiKey) {
-            apiKey = config?.api?.key
-        }
-
-        if (!apiKey) {
-            System.err.println("Error: No API key found. Run 'glm auth login' to authenticate.")
+        def providerInfo = ModelCatalog.getProvider(providerId)
+        if (!providerInfo) {
+            System.err.println("Error: Unknown provider '${providerId}'")
+            System.err.println("\nAvailable providers:")
+            ModelCatalog.getProviders().each { id, info ->
+                System.err.println("  ${id} - ${info.name}")
+            }
             return false
         }
 
-        client = new GlmClient(apiKey)
+        def authCredential = Auth.get(providerId)
+        if (!authCredential) {
+            System.err.println("Error: No credential found for provider '${providerId}'")
+            System.err.println("  Use 'glm auth login ${providerId}' to authenticate")
+            System.err.println("  Get your API key at: ${providerInfo.url}")
+            return false
+        }
+
+        try {
+            client = new GlmClient(providerId)
+        } catch (Exception e) {
+            System.err.println("Error initializing client: ${e.message}")
+            return false
+        }
 
         // Register tools
         tools << new ReadFileTool()
@@ -173,7 +195,7 @@ class JexerTUI extends TApplication {
         tools << new ListFilesTool()
 
         if (config?.webSearch?.enabled) {
-            tools << new WebSearchTool(apiKey)
+            tools << new WebSearchTool(authCredential.key)
         }
 
         if (config?.rag?.enabled) {
@@ -390,19 +412,37 @@ class JexerTUI extends TApplication {
                 if (args.isEmpty()) {
                     appendLog("Current model: ${currentModel}")
                 } else {
-                    currentModel = args
-                    appendLog("Model changed to: ${currentModel}")
+                    def parts = args.split('/', 2)
+                    if (parts.length != 2) {
+                        appendLog("Error: Model format should be 'provider/model-id'")
+                        appendLog("Example: opencode/big-pickle")
+                    } else {
+                        def newProviderId = parts[0]
+                        def newModelId = parts[1]
+                        
+                        def providerInfo = ModelCatalog.getProvider(newProviderId)
+                        if (!providerInfo) {
+                            appendLog("Error: Unknown provider '${newProviderId}'")
+                        } else {
+                            currentModel = args
+                            providerId = newProviderId
+                            modelId = newModelId
+                            appendLog("Model changed to: ${currentModel}")
+                            appendLog("Note: Restart TUI to apply model change")
+                        }
+                    }
                 }
                 appendLog('')
                 break
                 
             case 'models':
                 appendLog('Available models:')
-                appendLog('  glm-4-plus      - High-performance model')
-                appendLog('  glm-4           - Standard model')
-                appendLog('  glm-4-flash     - Fast, cost-effective')
-                appendLog('  glm-4-long      - Extended context')
-                appendLog('  glm-4.7         - Latest version')
+                def allModels = ModelCatalog.getAllModels()
+                allModels.values().sort { a, b -> a.provider <=> b.provider }.each { model ->
+                    def isFree = model.cost?.input == 0 && model.cost?.output == 0
+                    def freeTag = isFree ? ' (Free)' : ''
+                    appendLog("  ${model.provider}/${model.id}${freeTag} - ${model.name}")
+                }
                 appendLog('')
                 break
                 
@@ -575,7 +615,7 @@ class JexerTUI extends TApplication {
             try {
                 // Prepare request
                 ChatRequest request = new ChatRequest()
-                request.model = currentModel
+                request.model = modelId
                 request.messages = messages
                 request.stream = false
                 request.tools = tools.collect { tool ->

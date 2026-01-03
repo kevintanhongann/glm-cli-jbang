@@ -85,19 +85,33 @@ base_url = "https://open.bigmodel.cn/api/paas/v4/"
 
 | Key | Type | Default | Description |
 |------|------|---------|-------------|
-| `default_model` | string | `"glm-4-flash"` | Default GLM-4 model to use |
+| `default_model` | string | `"opencode/big-pickle"` | Default model to use (format: `provider/model-id`) |
 | `safety_mode` | string | `"ask"` | Safety mode for file operations |
 | `language` | string | `"auto"` | Language preference |
 | `max_steps` | integer | `null` (unlimited) | Maximum agent iterations before tools are disabled |
 
-#### Models
+#### Model Format
 
-Available values for `default_model`:
-- `glm-4-flash` - Fast, cost-effective
-- `glm-4` - Balanced quality/speed
-- `glm-4-plus` - Higher quality reasoning
-- `glm-4.5` - Latest with multi-function calls
-- `glm-4v` - Vision capabilities
+Models are specified as `provider/model-id`:
+
+**OpenCode Zen Provider:**
+- `opencode/big-pickle` - Stealth model (Free)
+- `opencode/glm-4.7-free` - Free version of GLM-4.7 (Free)
+- `opencode/glm-4.6` - GLM-4.6 model
+- `opencode/kimi-k2` - Moonshot Kimi K2
+- `opencode/kimi-k2-thinking` - Kimi K2 with thinking
+- `opencode/qwen3-coder` - Alibaba Qwen3 Coder 480B
+- `opencode/grok-code` - xAI Grok Code (Free)
+- `opencode/minimax-m2.1-free` - MiniMax M2.1 (Free)
+
+**Zai/Zhipu AI Provider:**
+- `zai/glm-4-flash` - Fast, cost-effective
+- `zai/glm-4.7` - GLM-4.7 model
+
+To see all available models, run:
+```bash
+glm models
+```
 
 #### Safety Modes
 

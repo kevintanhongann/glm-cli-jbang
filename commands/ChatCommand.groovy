@@ -8,6 +8,7 @@ import core.GlmClient
 import core.Config
 import core.SessionManager
 import core.MessageStore
+import core.ModelCatalog
 import models.ChatRequest
 import models.Message
 import models.ChatResponse
@@ -15,8 +16,8 @@ import models.ChatResponse
 @Command(name = "chat", description = "Start a chat session with GLM-4", mixinStandardHelpOptions = true)
 class ChatCommand implements Runnable {
 
-    @Option(names = ["-m", "--model"], description = "Model to use (default: glm-4.7)")
-    String model = "glm-4.7"
+    @Option(names = ["-m", "--model"], description = "Model to use (default: opencode/big-pickle)")
+    String model = "opencode/big-pickle"
 
     @Option(names = ["-s", "--session"], description = "Resume existing session by ID")
     String sessionId
@@ -32,24 +33,49 @@ class ChatCommand implements Runnable {
     private SessionManager sessionManager
     private MessageStore messageStore
     private String currentSessionId
+    private String providerId
+    private String modelId
 
     @Override
     void run() {
         Config config = Config.load()
 
-        // Priority: 1) env var, 2) auth.json (from `glm auth login`), 3) config.toml
-        String apiKey = System.getenv("ZAI_API_KEY")
-        if (!apiKey) {
-            def authCredential = Auth.get("zai")
-            apiKey = authCredential?.key
-        }
-        if (!apiKey) {
-            apiKey = config.api.key
-        }
-
         String modelToUse = model ?: config.behavior.defaultModel
+        
+        // Check if there are recent models and use the most recent one
+        if (!model && config.behavior.recentModels && !config.behavior.recentModels.isEmpty()) {
+            modelToUse = config.behavior.recentModels[0]
+        }
 
-        client = apiKey ? new GlmClient(apiKey) : new GlmClient()
+        def parts = modelToUse.split("/", 2)
+        if (parts.length == 2) {
+            providerId = parts[0]
+            modelId = parts[1]
+        } else {
+            println "Warning: Model format should be 'provider/model-id'. Using default provider 'opencode'."
+            providerId = "opencode"
+            modelId = parts[0]
+        }
+
+        def providerInfo = ModelCatalog.getProvider(providerId)
+        if (!providerInfo) {
+            println "Error: Unknown provider '${providerId}'"
+            println "\nAvailable providers:"
+            ModelCatalog.getProviders().each { id, info ->
+                println "  ${id} - ${info.name}"
+            }
+            return
+        }
+
+        def authCredential = Auth.get(providerId)
+        if (!authCredential) {
+            println "Error: No credential found for provider '${providerId}'"
+            println "  Use 'glm auth login ${providerId}' to authenticate"
+            println "  Get your API key at: ${providerInfo.url}"
+            return
+        }
+
+        client = new GlmClient(providerId)
 
         // Initialize session management
         sessionManager = SessionManager.instance
@@ -82,10 +108,13 @@ class ChatCommand implements Runnable {
             println "Starting new session: ${currentSessionId}"
         }
 
-        println "Model: ${modelToUse} (Type 'exit' or 'quit' to stop)"
+        def modelInfo = ModelCatalog.getModel(modelToUse)
+        def modelName = modelInfo?.name ?: modelId
+        
+        println "Model: ${providerId}/${modelId} (${modelName}) (Type 'exit' or 'quit' to stop)"
 
         // Update local model var for consistency
-        this.model = modelToUse
+        this.model = modelId
 
 
         if (initialMessage) {
@@ -122,7 +151,7 @@ class ChatCommand implements Runnable {
         sessionManager.touchSession(currentSessionId)
 
         ChatRequest request = new ChatRequest()
-        request.model = model
+        request.model = modelId
         request.messages = history
         request.stream = true
 

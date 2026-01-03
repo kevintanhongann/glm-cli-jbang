@@ -21,15 +21,21 @@ class Auth {
     /**
      * Store a credential for a provider
      */
-    static void set(String provider, AuthCredential credential) {
+    static void set(String provider, AuthCredential credential, Map<String, Object> metadata = [:]) {
         ensureAuthDir()
         def existing = all()
-        existing[provider] = [
+        def providerData = [
             type: credential.type,
             key: credential.key,
             provider: credential.provider,
             timestamp: System.currentTimeMillis()
         ]
+        
+        if (metadata) {
+            providerData.putAll(metadata)
+        }
+
+        existing[provider] = providerData
 
         AUTH_PATH.text = JsonOutput.toJson(existing)
         AUTH_PATH.setReadable(true, true)

@@ -13,6 +13,7 @@ import core.AgentType
 import core.AgentConfig
 import core.AgentRegistry
 import core.Instructions
+import core.ModelCatalog
 import models.ChatRequest
 import models.ChatResponse
 import models.Message
@@ -40,6 +41,8 @@ class LanternaTUI {
     private Label agentSwitcherLabel
 
     private String currentModel
+    private String providerId
+    private String modelId
     private String currentCwd
     private String apiKey
     private Config config
@@ -53,8 +56,19 @@ class LanternaTUI {
         this.agentRegistry = new AgentRegistry(AgentType.BUILD)
     }
 
-    void start(String model = 'glm-4.7', String cwd = null) {
+    void start(String model = 'opencode/big-pickle', String cwd = null) {
         this.currentModel = model
+        
+        def parts = model.split('/', 2)
+        if (parts.length == 2) {
+            this.providerId = parts[0]
+            this.modelId = parts[1]
+        } else {
+            System.err.println("Warning: Model format should be 'provider/model-id'. Using default provider 'opencode'.")
+            this.providerId = "opencode"
+            this.modelId = parts[0]
+        }
+        
         this.currentCwd = cwd ?: System.getProperty('user.dir')
 
         if (!initClient()) {
@@ -88,21 +102,30 @@ class LanternaTUI {
     private boolean initClient() {
         config = Config.load()
 
-        apiKey = System.getenv('ZAI_API_KEY')
-        if (!apiKey) {
-            def authCredential = Auth.get('zai')
-            apiKey = authCredential?.key
-        }
-        if (!apiKey) {
-            apiKey = config?.api?.key
-        }
-
-        if (!apiKey) {
-            System.err.println("Error: No API key found. Run 'glm auth login' to authenticate.")
+        def providerInfo = ModelCatalog.getProvider(providerId)
+        if (!providerInfo) {
+            System.err.println("Error: Unknown provider '${providerId}'")
+            System.err.println("\nAvailable providers:")
+            ModelCatalog.getProviders().each { id, info ->
+                System.err.println("  ${id} - ${info.name}")
+            }
             return false
         }
 
-        client = new GlmClient(apiKey)
+        def authCredential = Auth.get(providerId)
+        if (!authCredential) {
+            System.err.println("Error: No credential found for provider '${providerId}'")
+            System.err.println("  Use 'glm auth login ${providerId}' to authenticate")
+            System.err.println("  Get your API key at: ${providerInfo.url}")
+            return false
+        }
+
+        try {
+            client = new GlmClient(providerId)
+        } catch (Exception e) {
+            System.err.println("Error initializing client: ${e.message}")
+            return false
+        }
 
         tools << new ReadFileTool()
         tools << new WriteFileTool()
@@ -230,6 +253,12 @@ class LanternaTUI {
     }
 
     void processUserInput(String input, List<String> mentions = []) {
+        // Handle slash commands
+        if (input.startsWith('/')) {
+            handleSlashCommand(input)
+            return
+        }
+        
         activityLogPanel.appendUserMessage(input)
 
         Thread.start {
@@ -237,6 +266,138 @@ class LanternaTUI {
         }
     }
 
+    private void handleSlashCommand(String input) {
+        def parsed = CommandProvider.parse(input)
+        if (!parsed) {
+            appendSystemMessage("Unknown command: ${input}")
+            return
+        }
+        
+        String command = parsed.name
+        String args = parsed.arguments
+        
+        switch (command) {
+            case 'models':
+                // Defer dialog creation to avoid blocking in input filter context
+                Thread.start {
+                    showModelSelectionDialog()
+                }
+                break
+            
+            case 'model':
+                if (args) {
+                    switchModel(args)
+                } else {
+                    appendSystemMessage("Current model: ${currentModel}")
+                }
+                break
+            
+            case 'help':
+                showHelp()
+                break
+            
+            case 'clear':
+                activityLogPanel.clear()
+                activityLogPanel.appendWelcomeMessage(currentModel)
+                appendSystemMessage("Chat history cleared")
+                break
+            
+            case 'exit':
+                mainWindow.close()
+                break
+            
+            default:
+                appendSystemMessage("Command '${command}' is not yet implemented")
+        }
+    }
+    
+    private void appendSystemMessage(String message) {
+        activityLogPanel.getTextBox().getRenderer().addLine("ℹ️  ${message}")
+    }
+    
+    void showModelSelectionDialog() {
+        def dialog = new ModelSelectionDialog(textGUI)
+        String selectedModel = dialog.show()
+        
+        if (selectedModel) {
+            switchModel(selectedModel)
+        }
+    }
+    
+    private void switchModel(String newModel) {
+        try {
+            def parts = newModel.split('/', 2)
+            if (parts.length != 2) {
+                activityLogPanel.appendSystemMessage("Invalid model format. Expected: provider/model-id")
+                return
+            }
+            
+            String newProviderId = parts[0]
+            String newModelId = parts[1]
+            
+            // Validate model exists
+            def providerInfo = ModelCatalog.getProvider(newProviderId)
+            if (!providerInfo) {
+                activityLogPanel.appendSystemMessage("Unknown provider: ${newProviderId}")
+                return
+            }
+            
+            def modelInfo = ModelCatalog.getModel(newModel)
+            if (!modelInfo) {
+                activityLogPanel.appendSystemMessage("Unknown model: ${newModel}")
+                return
+            }
+            
+            // Check if provider is authenticated
+            def authCredential = Auth.get(newProviderId)
+            if (!authCredential) {
+                activityLogPanel.appendSystemMessage("Not authenticated for provider '${newProviderId}'")
+                activityLogPanel.appendSystemMessage("Run 'glm auth login ${newProviderId}' to authenticate")
+                return
+            }
+            
+            // Update model state
+            this.currentModel = newModel
+            this.providerId = newProviderId
+            this.modelId = newModelId
+            
+            // Reinitialize client
+            this.client = new GlmClient(newProviderId)
+            
+            // Update UI
+            updateWindowAndStatusBar()
+            
+            activityLogPanel.appendSystemMessage("Switched to model: ${newModel}")
+            
+        } catch (Exception e) {
+            activityLogPanel.appendSystemMessage("Error switching model: ${e.message}")
+        }
+    }
+    
+    private void updateWindowAndStatusBar() {
+        // Update window title
+        mainWindow.setTitle("GLM CLI - ${currentModel}")
+        
+        // Rebuild status bar to update model display
+        statusBar.removeAllComponents()
+        def statusBarComponents = createStatusBar().getComponents()
+        statusBarComponents.each { statusBar.addComponent(it) }
+    }
+    
+    private void showHelp() {
+        appendSystemMessage("=== Available Commands ===")
+        appendSystemMessage("/models   - Open model selection dialog")
+        appendSystemMessage("/model    - Show current model or switch to specific model")
+        appendSystemMessage("/help     - Show this help message")
+        appendSystemMessage("/clear    - Clear chat history")
+        appendSystemMessage("/exit     - Exit TUI")
+        appendSystemMessage("")
+        appendSystemMessage("Keyboard shortcuts:")
+        appendSystemMessage("Ctrl+M   - Open model selection dialog")
+        appendSystemMessage("Tab      - Switch agent")
+        appendSystemMessage("Ctrl+C   - Exit")
+    }
+    
     private void processInput(String userInput, List<String> mentions = []) {
         List<Message> messages = []
 
@@ -276,7 +437,7 @@ class LanternaTUI {
 
             try {
                 ChatRequest request = new ChatRequest()
-                request.model = currentModel
+                request.model = modelId
                 request.messages = messages
                 request.stream = false
                 request.tools = allowedTools.collect { tool ->

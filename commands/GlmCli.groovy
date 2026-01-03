@@ -8,7 +8,7 @@ import tui.LanternaTUI
 
 @Command(name = "glm", mixinStandardHelpOptions = true, version = "glm-cli 1.0.0",
         description = "GLM-4 based AI coding agent",
-        subcommands = [ChatCommand.class, AgentCommand.class, AuthCommand.class, InitCommand.class, SessionCommand.class])
+        subcommands = [ChatCommand.class, AgentCommand.class, AuthCommand.class, InitCommand.class, SessionCommand.class, ModelsCommand.class])
 class GlmCli implements Runnable {
 
     @Option(names = ["--simple"], description = "Use simple console mode (no TUI)")
@@ -17,8 +17,8 @@ class GlmCli implements Runnable {
     @Option(names = ["--tui"], description = "TUI backend to use (lanterna or jexer, default: lanterna)")
     String tuiBackend = "lanterna"
 
-    @Option(names = ["-m", "--model"], description = "Model to use (default: glm-4.7)")
-    String model = "glm-4.7"
+    @Option(names = ["-m", "--model"], description = "Model to use (default: opencode/big-pickle)")
+    String model = "opencode/big-pickle"
 
     @Override
     void run() {

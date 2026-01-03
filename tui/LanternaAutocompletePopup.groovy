@@ -4,6 +4,7 @@ import com.googlecode.lanterna.*
 import com.googlecode.lanterna.gui2.*
 import com.googlecode.lanterna.input.KeyStroke
 import com.googlecode.lanterna.input.KeyType
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Popup window for displaying autocomplete suggestions in Lanterna TUI.
@@ -18,6 +19,7 @@ class LanternaAutocompletePopup {
     private List<AutocompleteItem> filteredItems = []
     private AutocompleteItem selectedCallback = null
     private boolean visible = false
+    private Runnable onSelectionCallback = null
 
     private static final int MAX_VISIBLE_ITEMS = 8
     private static final int POPUP_WIDTH = 60
@@ -31,7 +33,6 @@ class LanternaAutocompletePopup {
     private void createPopupWindow() {
         popupWindow = new BasicWindow()
         popupWindow.setHints(Arrays.asList(
-            Window.Hint.NO_FOCUS,
             Window.Hint.NO_DECORATIONS,
             Window.Hint.FIXED_POSITION
         ))
@@ -43,6 +44,37 @@ class LanternaAutocompletePopup {
 
         panel.addComponent(actionListBox, BorderLayout.Location.CENTER)
         popupWindow.setComponent(panel)
+
+        setupKeyboardHandling()
+    }
+
+    private void setupKeyboardHandling() {
+        popupWindow.addWindowListener(new WindowListenerAdapter() {
+
+            @Override
+            void onUnhandledInput(Window basePane, KeyStroke keyStroke, AtomicBoolean hasBeenHandled) {
+                KeyType keyType = keyStroke.getKeyType()
+
+                if (keyType == KeyType.Escape) {
+                    hide()
+                    hasBeenHandled.set(true)
+                } else if (keyType == KeyType.Tab) {
+                    if (onSelectionCallback != null) {
+                        onSelectionCallback.run()
+                    }
+                    hide()
+                    hasBeenHandled.set(true)
+                } else if (keyType == KeyType.Character && !keyStroke.isAltDown() && !keyStroke.isCtrlDown()) {
+                    // Any other character key - hide popup and let it pass through
+                    hide()
+                    hasBeenHandled.set(false)
+                } else if (keyType == KeyType.Backspace) {
+                    hide()
+                    hasBeenHandled.set(false)
+                }
+            }
+
+        })
     }
 
     /**
@@ -52,6 +84,13 @@ class LanternaAutocompletePopup {
         this.allItems = items ?: []
         this.filteredItems = new ArrayList<>(allItems)
         updateActionList()
+    }
+
+    /**
+     * Set callback for when an item is selected.
+     */
+    void setOnSelection(Runnable callback) {
+        this.onSelectionCallback = callback
     }
 
     /**
@@ -76,7 +115,12 @@ class LanternaAutocompletePopup {
 
         filteredItems.each { item ->
             String label = formatItemLabel(item)
-            actionListBox.addItem(label, {}) // Empty runnable for display only
+            actionListBox.addItem(label, {
+                // When an item is selected via Enter/Space
+                if (onSelectionCallback != null) {
+                    onSelectionCallback.run()
+                }
+            } as Runnable)
         }
 
         if (!filteredItems.isEmpty()) {
@@ -177,4 +221,5 @@ class LanternaAutocompletePopup {
     boolean isEmpty() {
         return filteredItems.isEmpty()
     }
+
 }

@@ -18,10 +18,15 @@ class AuthCommand implements Runnable {
 @Command(name = "login", description = "Login to a provider", mixinStandardHelpOptions = true)
 class AuthLoginCommand implements Runnable {
 
-    @Parameters(index = "0", arity = "0..1", description = "Provider ID (default: zai)")
-    String provider = "zai"
+    @Parameters(index = "0", arity = "0..1", description = "Provider ID (default: opencode)")
+    String provider = "opencode"
 
     private static final Map PROVIDER_CONFIG = [
+        opencode: [
+            name: "OpenCode Zen",
+            description: "Big Pickle, GLM-4.7-free, and other curated models",
+            url: "https://opencode.ai/auth"
+        ],
         zai: [
             name: "Zai/Zhipu AI",
             description: "GLM-4 and Coding Plan API",
@@ -93,6 +98,11 @@ class AuthLogoutCommand implements Runnable {
     String provider
 
     private static final Map PROVIDER_CONFIG = [
+        opencode: [
+            name: "OpenCode Zen",
+            description: "Big Pickle, GLM-4.7-free, and other curated models",
+            url: "https://opencode.ai/auth"
+        ],
         zai: [
             name: "Zai/Zhipu AI",
             description: "GLM-4 and Coding Plan API",
@@ -165,6 +175,11 @@ class AuthLogoutCommand implements Runnable {
 class AuthListCommand implements Runnable {
 
     private static final Map PROVIDER_CONFIG = [
+        opencode: [
+            name: "OpenCode Zen",
+            description: "Big Pickle, GLM-4.7-free, and other curated models",
+            url: "https://opencode.ai/auth"
+        ],
         zai: [
             name: "Zai/Zhipu AI",
             description: "GLM-4 and Coding Plan API",

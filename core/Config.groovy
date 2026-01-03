@@ -9,79 +9,124 @@ import java.nio.file.Paths
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 class Config {
-    @JsonProperty("api")
+
+    @JsonProperty('api')
     ApiConfig api = new ApiConfig()
 
-    @JsonProperty("behavior")
+    @JsonProperty('behavior')
     BehaviorConfig behavior = new BehaviorConfig()
 
-    @JsonProperty("web_search")
+    @JsonProperty('web_search')
     WebSearchConfig webSearch = new WebSearchConfig()
 
-    @JsonProperty("rag")
+    @JsonProperty('rag')
     RagConfig rag = new RagConfig()
 
-    @JsonProperty("tui")
+    @JsonProperty('tui')
     TuiConfig tui = new TuiConfig()
 
-    @JsonProperty("experimental")
+    @JsonProperty('experimental')
     ExperimentalConfig experimental = new ExperimentalConfig()
 
-    @JsonProperty("instructions")
+    @JsonProperty('tool_heuristics')
+    ToolHeuristicsConfig toolHeuristics = new ToolHeuristicsConfig()
+
+    @JsonProperty('provider')
+    Map<String, ProviderConfig> provider = [:]
+
+    @JsonProperty('instructions')
     List<String> instructions = []
 
     static class ApiConfig {
+
         String key
-        @JsonProperty("base_url")
+        @JsonProperty('base_url')
         String baseUrl
+
     }
 
     static class BehaviorConfig {
-        String language = "auto"
-        @JsonProperty("safety_mode")
-        String safetyMode = "ask" // ask, always_allow
-        @JsonProperty("default_model")
-        String defaultModel = "glm-4-flash"
-        @JsonProperty("max_steps")
+
+        String language = 'auto'
+        @JsonProperty('safety_mode')
+        String safetyMode = 'ask' // ask, always_allow
+        @JsonProperty('default_model')
+        String defaultModel = 'zai/glm-4-flash'
+        @JsonProperty('max_steps')
         Integer maxSteps = null  // null = unlimited
+        @JsonProperty('recent_models')
+        List<String> recentModels = []
+        @JsonProperty('favorite_models')
+        List<String> favoriteModels = []
+
+    }
+
+    static class ProviderConfig {
+
+        @JsonProperty('endpoint')
+        String endpoint
+
+        @JsonProperty('auth_type')
+        String authType = 'bearer' // bearer or jwt
+
     }
 
     static class WebSearchConfig {
+
         Boolean enabled = true
-        @JsonProperty("default_count")
+        @JsonProperty('default_count')
         Integer defaultCount = 10
-        @JsonProperty("default_recency_filter")
-        String defaultRecencyFilter = "noLimit"
+        @JsonProperty('default_recency_filter')
+        String defaultRecencyFilter = 'noLimit'
+
     }
 
     static class RagConfig {
+
         Boolean enabled = false
-        @JsonProperty("cache_dir")
-        String cacheDir = "~/.glm/embeddings"
-        @JsonProperty("max_chunk_size")
+        @JsonProperty('cache_dir')
+        String cacheDir = '~/.glm/embeddings'
+        @JsonProperty('max_chunk_size')
         Integer maxChunkSize = 500
-        @JsonProperty("min_score")
+        @JsonProperty('min_score')
         Double minScore = 0.5
+
     }
 
     static class TuiConfig {
-        @JsonProperty("colors_enabled")
+
+        @JsonProperty('colors_enabled')
         Boolean colorsEnabled = true
-        @JsonProperty("diff_context_lines")
+        @JsonProperty('diff_context_lines')
         Integer diffContextLines = 3
-        @JsonProperty("agent_cycle_key")
-        String agentCycleKey = "tab"
-        @JsonProperty("agent_cycle_reverse_key")
-        String agentCycleReverseKey = "shift+tab"
+        @JsonProperty('agent_cycle_key')
+        String agentCycleKey = 'tab'
+        @JsonProperty('agent_cycle_reverse_key')
+        String agentCycleReverseKey = 'shift+tab'
+
     }
 
     static class ExperimentalConfig {
-        @JsonProperty("continue_loop_on_deny")
+
+        @JsonProperty('continue_loop_on_deny')
         Boolean continueLoopOnDeny = false  // If true, continues loop on permission deny; if false, stops loop
+
+    }
+
+    static class ToolHeuristicsConfig {
+
+        Boolean enabled = true
+        @JsonProperty('parallel_execution')
+        Boolean parallelExecution = true
+        @JsonProperty('max_parallel_tools')
+        Integer maxParallelTools = 10
+        @JsonProperty('suggest_explore_agent')
+        Boolean suggestExploreAgent = true
+
     }
 
     static Config load() {
-        Path configPath = Paths.get(System.getProperty("user.home"), ".glm", "config.toml")
+        Path configPath = Paths.get(System.getProperty('user.home'), '.glm', 'config.toml')
         if (Files.exists(configPath)) {
             try {
                 TomlMapper mapper = new TomlMapper()
@@ -92,4 +137,5 @@ class Config {
         }
         return new Config()
     }
+
 }

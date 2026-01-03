@@ -5,29 +5,59 @@ import java.nio.file.Path
 import java.nio.file.Paths
 
 class ListFilesTool implements Tool {
-    @Override
-    String getName() { "list_files" }
 
     @Override
-    String getDescription() { "List files in a directory." }
+    String getName() { 'list_files' }
+
+    @Override
+    String getDescription() {
+        return '''
+List the contents of a directory with optional recursive search.
+
+**WHEN TO USE:**
+- Understanding directory structure
+- Finding what files exist in a specific location
+- Exploring project layout
+- Checking if a directory exists before operations
+
+**PARAMETERS:**
+- path: directory path to list (default: current directory)
+- recursive: whether to list subdirectories (default: false)
+
+**BEST PRACTICES:**
+- Use for directory structure overview
+- Combine with glob for pattern matching
+- Use recursive=true for full tree view
+- Returns directories and files separately
+
+**WHEN NOT TO USE:**
+- When searching by pattern → use glob instead
+- When searching contents → use grep instead
+- For large codebases, use glob with patterns instead
+
+**PARALLEL EXECUTION:**
+- Can be combined with other list_files calls in parallel
+- Can be combined with glob or grep in parallel
+'''.stripIndent().trim()
+    }
 
     @Override
     Map<String, Object> getParameters() {
         return [
-            type: "object",
+            type: 'object',
             properties: [
-                path: [type: "string", description: "The directory path (default: .)."],
-                recursive: [type: "boolean", description: "List files recursively."]
+                path: [type: 'string', description: 'The directory path (default: .).'],
+                recursive: [type: 'boolean', description: 'List files recursively.']
             ],
-            required: ["path"]
+            required: ['path']
         ]
     }
 
     @Override
     Object execute(Map<String, Object> args) {
-        String pathStr = args.get("path") ?: "."
+        String pathStr = args.get('path') ?: '.'
         Path dir = Paths.get(pathStr).normalize()
-        
+
         if (!Files.exists(dir) || !Files.isDirectory(dir)) {
             return "Error: Directory not found: ${pathStr}"
         }
@@ -42,4 +72,5 @@ class ListFilesTool implements Tool {
             return "Error listing files: ${e.message}"
         }
     }
+
 }
