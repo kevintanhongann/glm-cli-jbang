@@ -32,12 +32,11 @@ class JexerSidebar extends TWindow {
     private ModifiedFilesSection modifiedFilesSection
 
     // Header
-    private TLabel headerLabel
     private TLabel collapseLabel
     private TLabel separatorLabel
 
-    JexerSidebar(TApplication app, String sessionId) {
-        super(app, '', WIDTH, 20, TWindow.NOCLOSEBOX | TWindow.ABSOLUTEXY)
+    JexerSidebar(TApplication app, String sessionId, int height) {
+        super(app, '', WIDTH, height, TWindow.NOCLOSEBOX | TWindow.ABSOLUTEXY)
         this.sessionId = sessionId
         this.application = app
 
@@ -72,32 +71,23 @@ class JexerSidebar extends TWindow {
         }
 
         // Collapse indicator
-        collapseLabel = new TLabel(expanded ? '▼' : '▶')
-        collapseLabel.setX(x + 1)
-        collapseLabel.setY(y + 1)
-        collapseLabel.getScreenCellAttributes().setForeColor(JexerTheme.getAccentColor())
-        add(collapseLabel)
+        collapseLabel = new TLabel(this, expanded ? '▼' : '▶', x + 1, y + 1)
+        // collapseLabel.getScreenCellAttributes().setForeColor(JexerTheme.getAccentColor())
 
         // Title
-        def title = new TLabel(' Sidebar ')
-        title.setX(x + 3)
-        title.setY(y + 1)
-        title.getScreenCellAttributes().setForeColor(JexerTheme.getTextColor())
-        add(title)
+        def title = new TLabel(this, ' Sidebar ', x + 3, y + 1)
+        // title.getScreenCellAttributes().setForeColor(JexerTheme.getTextColor())
 
         // Separator line
-        separatorLabel = new TLabel('─' * (WIDTH - 2))
-        separatorLabel.setX(x + 1)
-        separatorLabel.setY(y + 2)
-        separatorLabel.getScreenCellAttributes().setForeColor(JexerTheme.getSidebarBorderColor())
-        add(separatorLabel)
+        separatorLabel = new TLabel(this, '─' * (WIDTH - 2), x + 1, y + 2)
+    // separatorLabel.getScreenCellAttributes().setForeColor(JexerTheme.getSidebarBorderColor())
     }
 
     /**
      * Rebuild sidebar content based on expanded state.
      */
     private void rebuildContent() {
-        removeChildren()
+        getChildren().clear()
 
         if (!expanded) {
             // Collapsed state - just show expand hint
@@ -177,7 +167,7 @@ class JexerSidebar extends TWindow {
      */
     private void updateCollapseIndicator() {
         if (collapseLabel != null) {
-            collapseLabel.setText(expanded ? '▼' : '▶')
+            collapseLabel.setLabel(expanded ? '▼' : '▶')
         }
     }
 
@@ -219,6 +209,15 @@ class JexerSidebar extends TWindow {
             return
         }
         super.onKeypress(keypress)
+    }
+
+    /**
+     * Set screen cell at position.
+     */
+    private void setScreenCell(int x, int y, char ch, jexer.bits.CellAttributes attr) {
+        if (application.getScreen() != null) {
+            application.getScreen().putChar(getX() + x, getY() + y, ch, attr)
+        }
     }
 
 }

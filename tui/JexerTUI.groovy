@@ -316,23 +316,14 @@ class JexerTUI extends TApplication {
         statusBar.setAgent(agentRegistry.getCurrentAgentName())
         statusBar.setSidebarEnabled(sidebarEnabled)
 
-        // Add widgets to main window
-        mainChatWindow.add(activityLog)
-        mainChatWindow.add(commandInput)
-        mainChatWindow.add(statusBar)
+        // Widgets are already added to mainChatWindow via constructor
 
         // Create sidebar window (if enabled)
         if (sidebarEnabled) {
-            sidebarWindow = addWindow(
-                'Sidebar',
-                screenWidth - sidebarWidth - 1, 0, sidebarWidth, screenHeight - 2,
-                TWindow.NOCLOSEBOX | TWindow.ABSOLUTEXY
-            )
-
-            sidebarPanel = new JexerSidebar(this, sessionId)
-            sidebarPanel.setX(0)
+            sidebarPanel = new JexerSidebar(this, sessionId, screenHeight - 2)
+            sidebarPanel.setX(screenWidth - sidebarWidth - 1)
             sidebarPanel.setY(0)
-            sidebarWindow.add(sidebarPanel)
+            sidebarWindow = sidebarPanel
         }
     }
 

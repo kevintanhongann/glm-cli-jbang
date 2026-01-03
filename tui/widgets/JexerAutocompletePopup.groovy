@@ -5,6 +5,7 @@ import jexer.TWindow
 import jexer.TLabel
 import jexer.TAction
 import tui.AutocompleteItem
+import tui.JexerTheme
 
 /**
  * Autocomplete popup widget for Jexer.
@@ -86,14 +87,14 @@ class JexerAutocompletePopup extends TWindow {
 
         // Reset window if dimensions changed significantly
         if (Math.abs(getWidth() - width) > 5 || Math.abs(getHeight() - height) > 5) {
-            removeChildren()
+            getChildren().clear()
         }
 
         setDimensions(width, height)
         setTitle(triggerType + filter)
 
         // Build items
-        removeChildren()
+        getChildren().clear()
         filteredItems.eachWithIndex { AutocompleteItem item, int index ->
             int y = PADDING + index * ITEM_HEIGHT
 
@@ -116,23 +117,19 @@ class JexerAutocompletePopup extends TWindow {
                 label = "▸ ${item.value}"
             }
 
-            def labelWidget = new TLabel(label)
-            labelWidget.setX(PADDING + 1)
-            labelWidget.setY(y)
+            def labelWidget = new TLabel(this, label, PADDING + 1, y)
 
             // Set color based on selection
             if (index == selectedIndex) {
-                labelWidget.getScreenCellAttributes().setForeColor(
-                    JexerTheme.getBackgroundColor()
-                )
-                labelWidget.getScreenCellAttributes().setBold(true)
+                // labelWidget.getScreenCellAttributes().setForeColor(
+                //     JexerTheme.getBackgroundColor()
+                // )
+                // labelWidget.getScreenCellAttributes().setBold(true)
             } else {
-                labelWidget.getScreenCellAttributes().setForeColor(
-                    JexerTheme.getTextColor()
-                )
+                // labelWidget.getScreenCellAttributes().setForeColor(
+                //     JexerTheme.getTextColor()
+                // )
             }
-
-            add(labelWidget)
         }
 
         setHidden(false)
@@ -230,13 +227,13 @@ class JexerAutocompletePopup extends TWindow {
      */
     @Override
     public void onKeypress(jexer.event.TKeypressEvent keypress) {
-        if (keypress.getKey().equals(kbEnter)) {
+        if (keypress.getKey().equals(jexer.TKeypress.kbEnter)) {
             if (onSelectionCallback != null) {
                 onSelectionCallback.call()
             }
             return
         }
-        if (keypress.getKey().equals(kbEsc)) {
+        if (keypress.getKey().equals(jexer.TKeypress.kbEsc)) {
             showPopup(false)
             return
         }
@@ -264,6 +261,15 @@ class JexerAutocompletePopup extends TWindow {
         for (int i = 0; i < height; i++) {
             setScreenCell(x + width - 1, y + i, ' ', attr)
         }
-                      }
+    }
+
+    /**
+     * Set screen cell at position.
+     */
+    private void setScreenCell(int x, int y, char ch, jexer.bits.CellAttributes attr) {
+        if (getApplication()?.getScreen() != null) {
+            getApplication().getScreen().putChar(getX() + x, getY() + y, ch, attr)
+        }
+    }
 
 }

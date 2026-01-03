@@ -286,7 +286,7 @@ class JexerTUIEnhanced {
         )
 
         // Create activity log
-        activityLog = new JexerActivityLog(app, mainContentWidth - 2, activityLogHeight - 2)
+        activityLog = new JexerActivityLog(mainChatWindow, mainContentWidth - 2, activityLogHeight - 2)
         activityLog.setX(1)
         activityLog.setY(1)
         activityLog.setOnScrollPositionChanged { int currentLine, int totalLines ->
@@ -317,23 +317,14 @@ class JexerTUIEnhanced {
         statusBar.setAgent(agentRegistry.getCurrentAgentName())
         statusBar.setSidebarEnabled(sidebarEnabled)
 
-        // Add widgets to window
-        mainChatWindow.add(activityLog)
-        mainChatWindow.add(commandInput)
-        mainChatWindow.add(statusBar)
+        // Widgets are already added to mainChatWindow via constructor
 
         // Create sidebar window (if enabled)
         if (sidebarEnabled) {
-            sidebarWindow = app.addWindow(
-                'Sidebar',
-                screenWidth - sidebarWidth - 1, 0, sidebarWidth, screenHeight - 2,
-                TWindow.NOCLOSEBOX | TWindow.ABSOLUTEXY
-            )
-
-            sidebarPanel = new JexerSidebar(app, sessionId)
-            sidebarPanel.setX(0)
+            sidebarPanel = new JexerSidebar(app, sessionId, screenHeight - 2)
+            sidebarPanel.setX(screenWidth - sidebarWidth - 1)
             sidebarPanel.setY(0)
-            sidebarWindow.add(sidebarPanel)
+            sidebarWindow = sidebarPanel
         }
 
         // Initialize LSP tracking

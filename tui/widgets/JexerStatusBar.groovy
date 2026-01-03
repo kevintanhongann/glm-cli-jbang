@@ -43,19 +43,15 @@ class JexerStatusBar extends TWindow {
         int y = 0
 
         // Model label
-        modelLabel = new TLabel("Model: ${currentModel}")
-        modelLabel.setX(x)
-        modelLabel.setY(y)
-        modelLabel.getScreenCellAttributes().setForeColor(JexerTheme.getTextColor())
-        add(modelLabel)
-        x += modelLabel.getText().length() + 4
+        // Model label
+        String modelText = "Model: ${currentModel}"
+        modelLabel = new TLabel(this, modelText, x, y)
+        // modelLabel.getScreenCellAttributes().setForeColor(JexerTheme.getTextColor())
+        x += modelText.length() + 4
 
         // Separator
-        def sep1 = new TLabel('|')
-        sep1.setX(x)
-        sep1.setY(y)
-        sep1.getScreenCellAttributes().setForeColor(JexerTheme.getTextMutedColor())
-        add(sep1)
+        def sep1 = new TLabel(this, '|', x, y)
+        // sep1.getScreenCellAttributes().setForeColor(JexerTheme.getTextMutedColor())
         x += 3
 
         // Directory label (truncated)
@@ -63,83 +59,56 @@ class JexerStatusBar extends TWindow {
         if (dirName.length() > 15) {
             dirName = dirName[0..12] + '...'
         }
-        directoryLabel = new TLabel("Dir: ${dirName}")
-        directoryLabel.setX(x)
-        directoryLabel.setY(y)
-        directoryLabel.getScreenCellAttributes().setForeColor(JexerTheme.getTextMutedColor())
-        add(directoryLabel)
-        x += directoryLabel.getText().length() + 4
+        directoryLabel = new TLabel(this, "Dir: ${dirName}", x, y)
+        // directoryLabel.getScreenCellAttributes().setForeColor(JexerTheme.getTextMutedColor())
+        x += ("Dir: ${dirName}").length() + 4
 
         // Separator
-        def sep2 = new TLabel('|')
-        sep2.setX(x)
-        sep2.setY(y)
-        sep2.getScreenCellAttributes().setForeColor(JexerTheme.getTextMutedColor())
-        add(sep2)
+        def sep2 = new TLabel(this, '|', x, y)
+        // sep2.getScreenCellAttributes().setForeColor(JexerTheme.getTextMutedColor())
         x += 3
 
         // Scroll position label (only when not at bottom)
-        scrollLabel = new TLabel('')
-        scrollLabel.setX(x)
-        scrollLabel.setY(y)
-        scrollLabel.getScreenCellAttributes().setForeColor(JexerTheme.getTextMutedColor())
-        add(scrollLabel)
+        scrollLabel = new TLabel(this, '', x, y)
+        // scrollLabel.getScreenCellAttributes().setForeColor(JexerTheme.getTextMutedColor())
         x += 20 // Reserve space
 
         // Separator
-        def sep3 = new TLabel('|')
-        sep3.setX(x)
-        sep3.setY(y)
-        sep3.getScreenCellAttributes().setForeColor(JexerTheme.getTextMutedColor())
-        add(sep3)
+        def sep3 = new TLabel(this, '|', x, y)
+        // sep3.getScreenCellAttributes().setForeColor(JexerTheme.getTextMutedColor())
         x += 3
 
         // Shortcuts label
-        shortcutsLabel = new TLabel('Ctrl+S:Save  Ctrl+C:Exit')
-        shortcutsLabel.setX(x)
-        shortcutsLabel.setY(y)
-        shortcutsLabel.getScreenCellAttributes().setForeColor(JexerTheme.getTextMutedColor())
-        add(shortcutsLabel)
-        x += shortcutsLabel.getText().length() + 4
+        // Shortcuts label
+        String shortcutsText = 'Ctrl+S:Save  Ctrl+C:Exit'
+        shortcutsLabel = new TLabel(this, shortcutsText, x, y)
+        // shortcutsLabel.getScreenCellAttributes().setForeColor(JexerTheme.getTextMutedColor())
+        x += shortcutsText.length() + 4
 
         // Separator
-        def sep4 = new TLabel('|')
-        sep4.setX(x)
-        sep4.setY(y)
-        sep4.getScreenCellAttributes().setForeColor(JexerTheme.getTextMutedColor())
-        add(sep4)
+        def sep4 = new TLabel(this, '|', x, y)
+        // sep4.getScreenCellAttributes().setForeColor(JexerTheme.getTextMutedColor())
         x += 3
 
         // Agent label
-        agentLabel = new TLabel(currentAgent)
-        agentLabel.setX(x)
-        agentLabel.setY(y)
-        agentLabel.getScreenCellAttributes().setForeColor(JexerTheme.getAgentBuildColor())
-        agentLabel.getScreenCellAttributes().setBold(true)
-        add(agentLabel)
+        agentLabel = new TLabel(this, currentAgent, x, y)
+        // agentLabel.getScreenCellAttributes().setForeColor(JexerTheme.getAgentBuildColor())
+        // agentLabel.getScreenCellAttributes().setBold(true)
 
         // Tab hint
-        def tabLabel = new TLabel(' (Tab to switch)')
-        tabLabel.setX(x + currentAgent.length())
-        tabLabel.setY(y)
-        tabLabel.getScreenCellAttributes().setForeColor(JexerTheme.getTextMutedColor())
-        add(tabLabel)
+        String tabText = ' (Tab to switch)'
+        def tabLabel = new TLabel(this, tabText, x + currentAgent.length(), y)
+        // tabLabel.getScreenCellAttributes().setForeColor(JexerTheme.getTextMutedColor())
 
         // Sidebar hint (if enabled)
         if (showSidebarHint) {
-            x += tabLabel.getText().length() + 5
-            def sep5 = new TLabel('|')
-            sep5.setX(x)
-            sep5.setY(y)
-            sep5.getScreenCellAttributes().setForeColor(JexerTheme.getTextMutedColor())
-            add(sep5)
+            x += tabText.length() + 5
+            def sep5 = new TLabel(this, '|', x, y)
+            // sep5.getScreenCellAttributes().setForeColor(JexerTheme.getTextMutedColor())
 
             x += 3
-            def sidebarLabel = new TLabel('/sidebar:Toggle')
-            sidebarLabel.setX(x)
-            sidebarLabel.setY(y)
-            sidebarLabel.getScreenCellAttributes().setForeColor(JexerTheme.getTextMutedColor())
-            add(sidebarLabel)
+            def sidebarLabel = new TLabel(this, '/sidebar:Toggle', x, y)
+        // sidebarLabel.getScreenCellAttributes().setForeColor(JexerTheme.getTextMutedColor())
         }
     }
 
@@ -168,11 +137,11 @@ class JexerStatusBar extends TWindow {
         // Update agent label color
         if (agentLabel != null) {
             if (agent == 'BUILD') {
-                agentLabel.getScreenCellAttributes().setForeColor(JexerTheme.getAgentBuildColor())
+            // agentLabel.getScreenCellAttributes().setForeColor(JexerTheme.getAgentBuildColor())
             } else if (agent == 'PLAN') {
-                agentLabel.getScreenCellAttributes().setForeColor(JexerTheme.getAgentPlanColor())
+            // agentLabel.getScreenCellAttributes().setForeColor(JexerTheme.getAgentPlanColor())
             } else {
-                agentLabel.getScreenCellAttributes().setForeColor(JexerTheme.getTextColor())
+            // agentLabel.getScreenCellAttributes().setForeColor(JexerTheme.getTextColor())
             }
         }
 
@@ -189,9 +158,9 @@ class JexerStatusBar extends TWindow {
         if (scrollLabel != null) {
             // Only show when not at bottom
             if (current < total - 5) {
-                scrollLabel.setText("Line ${current}/${total}")
+                scrollLabel.setLabel("Line ${current}/${total}")
             } else {
-                scrollLabel.setText('')
+                scrollLabel.setLabel('')
             }
         }
     }
@@ -209,7 +178,7 @@ class JexerStatusBar extends TWindow {
      */
     private void rebuild() {
         buildUI()
-        invalidate()
+// invalidate()
     }
 
     /**
