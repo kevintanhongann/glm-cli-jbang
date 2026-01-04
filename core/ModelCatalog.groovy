@@ -44,7 +44,7 @@ class ModelCatalog {
             name: "Zai/Zhipu AI",
             description: "GLM-4 and Coding Plan API",
             modelsUrl: null,
-            endpoint: "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+            endpoint: "https://api.z.ai/api/paas/v4/chat/completions",
             authType: "jwt"
         ],
         opencode: [
