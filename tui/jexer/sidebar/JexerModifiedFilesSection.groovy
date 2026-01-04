@@ -43,13 +43,13 @@ class ModifiedFilesSection {
      * Render section at specified Y position.
      * Returns Y position after rendering.
      */
-    int render(int startY, int startX) {
+    int render(int startY, int startX, int windowX = 0, int windowY = 0) {
         int y = startY
 
         if (modifiedFiles.isEmpty()) {
             // No modified files - show message
             def headerLine = "│"
-            setScreenCell(startX, y, headerLine, JexerTheme.createAttributes(
+            setScreenCell(startX + windowX, y + windowY, headerLine, JexerTheme.createAttributes(
                 JexerTheme.getSidebarTreeColor(),
                 JexerTheme.getBackgroundColor()
             ))
@@ -57,7 +57,7 @@ class ModifiedFilesSection {
             def headerText = "📄 No modified files"
             for (int i = 0; i < headerText.length() && i + startX + 1 < width; i++) {
                 char ch = headerText.charAt(i)
-                setScreenCell(startX + i + 1, y, ch, JexerTheme.createAttributes(
+                setScreenCell(startX + i + 1 + windowX, y + windowY, ch, JexerTheme.createAttributes(
                     JexerTheme.getTextMutedColor(),
                     JexerTheme.getBackgroundColor()
                 ))
@@ -69,7 +69,7 @@ class ModifiedFilesSection {
             def sepLine = "└" + "─" * (width - 2)
             for (int i = 0; i < sepLine.length(); i++) {
                 char ch = sepLine.charAt(i)
-                setScreenCell(startX + i, y, ch, JexerTheme.createAttributes(
+                setScreenCell(startX + i + windowX, y + windowY, ch, JexerTheme.createAttributes(
                     JexerTheme.getSidebarBorderColor(),
                     JexerTheme.getBackgroundColor()
                 ))
@@ -85,7 +85,7 @@ class ModifiedFilesSection {
 
         // Section header with tree
         def headerLine = "│"
-        setScreenCell(startX, y, headerLine, JexerTheme.createAttributes(
+        setScreenCell(startX + windowX, y + windowY, headerLine, JexerTheme.createAttributes(
             JexerTheme.getSidebarTreeColor(),
             JexerTheme.getBackgroundColor()
         ))
@@ -93,7 +93,7 @@ class ModifiedFilesSection {
         def headerText = "📄 Modified Files (${modifiedFiles.size()})"
         for (int i = 0; i < headerText.length() && i + startX + 1 < width; i++) {
             char ch = headerText.charAt(i)
-            setScreenCell(startX + i + 1, y, ch, JexerTheme.createAttributes(
+            setScreenCell(startX + i + 1 + windowX, y + windowY, ch, JexerTheme.createAttributes(
                 JexerTheme.getTextColor(),
                 JexerTheme.getBackgroundColor()
             ))
@@ -112,7 +112,7 @@ class ModifiedFilesSection {
             def fileLine = "│  📄 ${fileName}"
             for (int i = 0; i < fileLine.length() && i + startX + 1 < width; i++) {
                 char ch = fileLine.charAt(i)
-                setScreenCell(startX + i + 1, y, ch, JexerTheme.createAttributes(
+                setScreenCell(startX + i + 1 + windowX, y + windowY, ch, JexerTheme.createAttributes(
                     JexerTheme.getTextMutedColor(),
                     JexerTheme.getBackgroundColor()
                 ))
@@ -126,7 +126,7 @@ class ModifiedFilesSection {
             def moreLine = "│  ... and ${modifiedFiles.size() - shownCount} more"
             for (int i = 0; i < moreLine.length() && i + startX + 1 < width; i++) {
                 char ch = moreLine.charAt(i)
-                setScreenCell(startX + i + 1, y, ch, JexerTheme.createAttributes(
+                setScreenCell(startX + i + 1 + windowX, y + windowY, ch, JexerTheme.createAttributes(
                     JexerTheme.getTextMutedColor(),
                     JexerTheme.getBackgroundColor()
                 ))
@@ -139,7 +139,7 @@ class ModifiedFilesSection {
         def sepLine = "└" + "─" * (width - 2)
         for (int i = 0; i < sepLine.length(); i++) {
             char ch = sepLine.charAt(i)
-            setScreenCell(startX + i, y, ch, JexerTheme.createAttributes(
+            setScreenCell(startX + i + windowX, y + windowY, ch, JexerTheme.createAttributes(
                 JexerTheme.getSidebarBorderColor(),
                 JexerTheme.getBackgroundColor()
             ))
@@ -159,27 +159,10 @@ class ModifiedFilesSection {
     private void setScreenCell(int x, int y, char ch, jexer.bits.CellAttributes attr) {
         def screen = application.getScreen()
         if (screen != null) {
-            int screenX = getX() + x
-            int screenY = getY() + y
-
-            if (screenX >= 0 && screenX < screen.getWidth() &&
-                screenY >= 0 && screenY < screen.getHeight()) {
-                screen.putChar(screenX, screenY, ch, attr)
+            if (x >= 0 && x < screen.getWidth() &&
+                y >= 0 && y < screen.getHeight()) {
+                screen.putChar(x, y, ch, attr)
             }
         }
-    }
-
-    /**
-     * Get X position (to be overridden by parent).
-     */
-    int getX() {
-        return 0
-    }
-
-    /**
-     * Get Y position (to be overridden by parent).
-     */
-    int getY() {
-        return 0
     }
 }

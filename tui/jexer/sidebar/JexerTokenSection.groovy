@@ -45,12 +45,12 @@ class TokenSection {
      * Render section at specified Y position.
      * Returns Y position after rendering.
      */
-    int render(int startY, int startX) {
+    int render(int startY, int startX, int windowX = 0, int windowY = 0) {
         int y = startY
 
         // Section header with tree
         def headerLine = "│"
-        setScreenCell(startX, y, headerLine, JexerTheme.createAttributes(
+        setScreenCell(startX + windowX, y + windowY, headerLine, JexerTheme.createAttributes(
             JexerTheme.getSidebarTreeColor(),
             JexerTheme.getBackgroundColor()
         ))
@@ -58,7 +58,7 @@ class TokenSection {
         def headerText = "📊 Token Usage"
         for (int i = 0; i < headerText.length() && i + startX + 1 < width; i++) {
             char ch = headerText.charAt(i)
-            setScreenCell(startX + i + 1, y, ch, JexerTheme.createAttributes(
+            setScreenCell(startX + i + 1 + windowX, y + windowY, ch, JexerTheme.createAttributes(
                 JexerTheme.getTextColor(),
                 JexerTheme.getBackgroundColor()
             ))
@@ -70,7 +70,7 @@ class TokenSection {
         def inLine = "│  Input:  ${inputTokens}"
         for (int i = 0; i < inLine.length() && i + startX + 1 < width; i++) {
             char ch = inLine.charAt(i)
-            setScreenCell(startX + i + 1, y, ch, JexerTheme.createAttributes(
+            setScreenCell(startX + i + 1 + windowX, y + windowY, ch, JexerTheme.createAttributes(
                 JexerTheme.getTextMutedColor(),
                 JexerTheme.getBackgroundColor()
             ))
@@ -82,7 +82,7 @@ class TokenSection {
         def outLine = "│  Output: ${outputTokens}"
         for (int i = 0; i < outLine.length() && i + startX + 1 < width; i++) {
             char ch = outLine.charAt(i)
-            setScreenCell(startX + i + 1, y, ch, JexerTheme.createAttributes(
+            setScreenCell(startX + i + 1 + windowX, y + windowY, ch, JexerTheme.createAttributes(
                 JexerTheme.getTextMutedColor(),
                 JexerTheme.getBackgroundColor()
             ))
@@ -95,7 +95,7 @@ class TokenSection {
         def totalLine = "│  Total:  ${totalTokens}"
         for (int i = 0; i < totalLine.length() && i + startX + 1 < width; i++) {
             char ch = totalLine.charAt(i)
-            setScreenCell(startX + i + 1, y, ch, JexerTheme.createAttributes(
+            setScreenCell(startX + i + 1 + windowX, y + windowY, ch, JexerTheme.createAttributes(
                 JexerTheme.getTextMutedColor(),
                 JexerTheme.getBackgroundColor()
             ))
@@ -108,7 +108,7 @@ class TokenSection {
         def costLine = "│  Cost:   ${costStr}"
         for (int i = 0; i < costLine.length() && i + startX + 1 < width; i++) {
             char ch = costLine.charAt(i)
-            setScreenCell(startX + i + 1, y, ch, JexerTheme.createAttributes(
+            setScreenCell(startX + i + 1 + windowX, y + windowY, ch, JexerTheme.createAttributes(
                 JexerTheme.getSuccessColor(),
                 JexerTheme.getBackgroundColor()
             ))
@@ -120,7 +120,7 @@ class TokenSection {
         def sepLine = "└" + "─" * (width - 2)
         for (int i = 0; i < sepLine.length(); i++) {
             char ch = sepLine.charAt(i)
-            setScreenCell(startX + i, y, ch, JexerTheme.createAttributes(
+            setScreenCell(startX + i + windowX, y + windowY, ch, JexerTheme.createAttributes(
                 JexerTheme.getSidebarBorderColor(),
                 JexerTheme.getBackgroundColor()
             ))
@@ -140,27 +140,10 @@ class TokenSection {
     private void setScreenCell(int x, int y, char ch, jexer.bits.CellAttributes attr) {
         def screen = application.getScreen()
         if (screen != null) {
-            int screenX = getX() + x
-            int screenY = getY() + y
-
-            if (screenX >= 0 && screenX < screen.getWidth() &&
-                screenY >= 0 && screenY < screen.getHeight()) {
-                screen.putChar(screenX, screenY, ch, attr)
+            if (x >= 0 && x < screen.getWidth() &&
+                y >= 0 && y < screen.getHeight()) {
+                screen.putChar(x, y, ch, attr)
             }
         }
-    }
-
-    /**
-     * Get X position (to be overridden by parent).
-     */
-    int getX() {
-        return 0
-    }
-
-    /**
-     * Get Y position (to be overridden by parent).
-     */
-    int getY() {
-        return 0
     }
 }

@@ -24,6 +24,9 @@ class JexerAutocompletePopup extends TWindow {
 
     private Closure onSelectionCallback = null
 
+    // Track managed widgets for proper cleanup
+    private List<jexer.TWidget> managedWidgets = []
+
     JexerAutocompletePopup(TApplication app) {
         super(app, '', 20, 10, TWindow.NOCLOSEBOX | TWindow.HIDEONCLOSE)
         setHidden(true)
@@ -85,22 +88,24 @@ class JexerAutocompletePopup extends TWindow {
         int visibleCount = Math.min(MAX_VISIBLE_ITEMS, filteredItems.size())
         int height = visibleCount * ITEM_HEIGHT + 2
 
-        // Reset window if dimensions changed significantly
-        if (Math.abs(getWidth() - width) > 5 || Math.abs(getHeight() - height) > 5) {
-            getChildren().clear()
-        }
-
-        setDimensions(width, height)
+        // Set dimensions properly using setWidth/setHeight
+        setWidth(width)
+        setHeight(height)
         setTitle(triggerType + filter)
 
+        // Remove managed widgets properly
+        managedWidgets.each { widget ->
+            remove(widget)
+        }
+        managedWidgets.clear()
+
         // Build items
-        getChildren().clear()
         filteredItems.eachWithIndex { AutocompleteItem item, int index ->
             int y = PADDING + index * ITEM_HEIGHT
 
             // Highlight selected item
             if (index == selectedIndex) {
-                addBox(y, PADDING, width - 2 * PADDING, 1,
+                drawHighlightBox(PADDING, y, width - 2 * PADDING, ITEM_HEIGHT,
                          JexerTheme.createAttributes(
                              JexerTheme.getBackgroundColor(),
                              JexerTheme.getAccentColor()
@@ -118,18 +123,7 @@ class JexerAutocompletePopup extends TWindow {
             }
 
             def labelWidget = new TLabel(this, label, PADDING + 1, y)
-
-            // Set color based on selection
-            if (index == selectedIndex) {
-                // labelWidget.getScreenCellAttributes().setForeColor(
-                //     JexerTheme.getBackgroundColor()
-                // )
-                // labelWidget.getScreenCellAttributes().setBold(true)
-            } else {
-                // labelWidget.getScreenCellAttributes().setForeColor(
-                //     JexerTheme.getTextColor()
-                // )
-            }
+            managedWidgets.add(labelWidget)
         }
 
         setHidden(false)
@@ -241,25 +235,16 @@ class JexerAutocompletePopup extends TWindow {
     }
 
     /**
-     * Add a colored box for highlighting.
+     * Draw a highlighted box for selection.
+     * Uses proper (col, row) coordinate order.
      */
-    private void addBox(int x, int y, int width, int height,
+    private void drawHighlightBox(int col, int row, int width, int height,
                       jexer.bits.CellAttributes attr) {
-        // Top border
-        for (int i = 0; i < width; i++) {
-            setScreenCell(x + i, y, ' ', attr)
-        }
-        // Bottom border
-        for (int i = 0; i < width; i++) {
-            setScreenCell(x + i, y + height - 1, ' ', attr)
-        }
-        // Left border
-        for (int i = 0; i < height; i++) {
-            setScreenCell(x, y + i, ' ', attr)
-        }
-        // Right border
-        for (int i = 0; i < height; i++) {
-            setScreenCell(x + width - 1, y + i, ' ', attr)
+        // Fill the box area
+        for (int dy = 0; dy < height; dy++) {
+            for (int dx = 0; dx < width; dx++) {
+                setScreenCell(col + dx, row + dy, ' ', attr)
+            }
         }
     }
 

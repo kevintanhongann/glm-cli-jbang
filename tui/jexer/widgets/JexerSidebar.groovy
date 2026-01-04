@@ -35,6 +35,9 @@ class JexerSidebar extends TWindow {
     private TLabel collapseLabel
     private TLabel separatorLabel
 
+    // Track managed widgets for proper cleanup
+    private List<jexer.TWidget> managedWidgets = []
+
     JexerSidebar(TApplication app, String sessionId, int height) {
         super(app, '', WIDTH, height, TWindow.NOCLOSEBOX | TWindow.ABSOLUTEXY)
         this.sessionId = sessionId
@@ -72,22 +75,26 @@ class JexerSidebar extends TWindow {
 
         // Collapse indicator
         collapseLabel = new TLabel(this, expanded ? '▼' : '▶', x + 1, y + 1)
-        // collapseLabel.getScreenCellAttributes().setForeColor(JexerTheme.getAccentColor())
+        managedWidgets.add(collapseLabel)
 
         // Title
         def title = new TLabel(this, ' Sidebar ', x + 3, y + 1)
-        // title.getScreenCellAttributes().setForeColor(JexerTheme.getTextColor())
+        managedWidgets.add(title)
 
         // Separator line
         separatorLabel = new TLabel(this, '─' * (WIDTH - 2), x + 1, y + 2)
-    // separatorLabel.getScreenCellAttributes().setForeColor(JexerTheme.getSidebarBorderColor())
+        managedWidgets.add(separatorLabel)
     }
 
     /**
      * Rebuild sidebar content based on expanded state.
      */
     private void rebuildContent() {
-        getChildren().clear()
+        // Remove managed widgets properly
+        managedWidgets.each { widget ->
+            remove(widget)
+        }
+        managedWidgets.clear()
 
         if (!expanded) {
             // Collapsed state - just show expand hint
@@ -100,16 +107,16 @@ class JexerSidebar extends TWindow {
 
         // Draw sections
         int currentY = startY
-        currentY = sessionInfoSection.render(currentY, 1)
+        currentY = sessionInfoSection.render(currentY, 1, getX(), getY())
         currentY += SECTION_GAP
 
-        currentY = tokenSection.render(currentY, 1)
+        currentY = tokenSection.render(currentY, 1, getX(), getY())
         currentY += SECTION_GAP
 
-        currentY = lspSection.render(currentY, 1)
+        currentY = lspSection.render(currentY, 1, getX(), getY())
         currentY += SECTION_GAP
 
-        currentY = modifiedFilesSection.render(currentY, 1)
+        currentY = modifiedFilesSection.render(currentY, 1, getX(), getY())
 
         // Draw bottom border
         drawBottomBorder(currentY + 1)

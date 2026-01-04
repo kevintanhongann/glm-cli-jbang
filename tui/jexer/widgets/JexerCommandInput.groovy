@@ -27,6 +27,7 @@ class JexerCommandInput extends TField {
     private String currentCwd
     private Closure onSubmitCallback = null
     private TWindow parentWindow
+    private int textPosition = 0
 
     JexerCommandInput(TWindow parent, int width, String cwd = null) {
         super(parent, 0, 0, width, false)
@@ -79,12 +80,12 @@ class JexerCommandInput extends TField {
         }
 
         // Backspace may close autocomplete
-        if (keypress.getKey() == kbBackspace) {
+        if (keypress.getKey().equals(kbBackspace)) {
             handleBackspace()
         }
 
         // Enter submits input (when popup not visible)
-        if (keypress.getKey() == kbEnter) {
+        if (keypress.getKey().equals(kbEnter)) {
             if (autocompletePopup == null || !autocompletePopup.isPopupVisible()) {
                 submitInput()
                 return
@@ -106,6 +107,7 @@ class JexerCommandInput extends TField {
         // Escape clears input
         if (keypress.getKey() == kbEsc) {
             setText('')
+            textPosition = 0
             if (autocompletePopup != null) {
                 autocompletePopup.showPopup(false)
             }
@@ -114,6 +116,23 @@ class JexerCommandInput extends TField {
 
         // Let parent handle normal text input
         super.onKeypress(keypress)
+
+        // Update text position after keypress
+        updateCursorPosition()
+    }
+
+    /**
+     * Update cursor position approximation.
+     */
+    private void updateCursorPosition() {
+        textPosition = getText().length()
+    }
+
+    /**
+     * Get cursor position approximation.
+     */
+    int getCursorPosition() {
+        return textPosition
     }
 
     /**
@@ -168,7 +187,7 @@ class JexerCommandInput extends TField {
      */
     private boolean handleTrigger(char triggerChar) {
         String currentText = getText()
-        int cursorPos = getCursorPosition()
+        int cursorPos = textPosition
 
         boolean canTrigger = false
         if (triggerChar == '@') {
@@ -202,7 +221,7 @@ class JexerCommandInput extends TField {
      */
     private void handleBackspace() {
         if (autocompletePopup != null && autocompletePopup.isPopupVisible()) {
-            int cursorPos = getCursorPosition()
+            int cursorPos = textPosition
             if (cursorPos <= triggerPosition) {
                 autocompletePopup.showPopup(false)
             } else {
@@ -246,7 +265,7 @@ class JexerCommandInput extends TField {
         if (triggerPosition < 0 || autocompletePopup == null) return
 
         String currentText = getText()
-        int cursorPos = getCursorPosition()
+        int cursorPos = textPosition
 
         if (cursorPos <= triggerPosition || cursorPos > currentText.length()) {
             autocompletePopup.showPopup(false)
@@ -275,7 +294,7 @@ class JexerCommandInput extends TField {
         if (triggerPosition < 0) return
 
         String currentText = getText()
-        int cursorPos = getCursorPosition()
+        int cursorPos = textPosition
 
         String before = triggerPosition > 0 ? currentText.substring(0, triggerPosition) : ''
         String after = cursorPos < currentText.length() ? currentText.substring(cursorPos) : ''
@@ -284,6 +303,7 @@ class JexerCommandInput extends TField {
         String newText = before + insertion + after
 
         setText(newText)
+        textPosition = newText.length()
 
         // Reset trigger state
         triggerPosition = -1
@@ -338,6 +358,7 @@ class JexerCommandInput extends TField {
 
             // Clear input
             setText('')
+            textPosition = 0
 
             // Reset trigger state
             triggerPosition = -1
@@ -376,6 +397,7 @@ class JexerCommandInput extends TField {
      */
     void clear() {
         setText('')
+        textPosition = 0
         triggerPosition = -1
         triggerType = null
         if (autocompletePopup != null) {

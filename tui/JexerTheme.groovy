@@ -153,28 +153,28 @@ class JexerTheme {
      * Get sidebar background color (dark blue-gray).
      */
     static Color getSidebarBackgroundColor() {
-        return new Color(1, 1, 2)
+        return Color.BLACK
     }
 
     /**
      * Get sidebar border color.
      */
     static Color getSidebarBorderColor() {
-        return new Color(2, 2, 3)
+        return Color.CYAN
     }
 
     /**
      * Get sidebar header color.
      */
     static Color getSidebarHeaderColor() {
-        return new Color(3, 3, 4)
+        return Color.WHITE
     }
 
     /**
      * Get sidebar tree color (for │, └, ├).
      */
     static Color getSidebarTreeColor() {
-        return new Color(2, 2, 3)
+        return Color.CYAN
     }
 
     /**

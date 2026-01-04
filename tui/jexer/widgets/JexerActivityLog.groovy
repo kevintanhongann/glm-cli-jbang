@@ -71,14 +71,8 @@ class JexerActivityLog extends TText {
      * Update display with wrapped text.
      */
     private void updateDisplay() {
-        String currentText = getText()
-        int maxWidth = getWidth()
-
-        if (currentText && maxWidth > 0) {
-            // Simple word wrapping for display
-            String wrappedText = wrapText(content.toString(), maxWidth)
-            setText(wrappedText)
-        }
+        // TText handles wrapping internally - don't pre-wrap
+        setText(content.toString())
 
         // Scroll to bottom by default
         scrollToBottom()

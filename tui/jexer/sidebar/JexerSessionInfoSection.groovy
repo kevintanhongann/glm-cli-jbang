@@ -46,12 +46,12 @@ class SessionInfoSection {
      * Render section at specified Y position.
      * Returns Y position after rendering.
      */
-    int render(int startY, int startX) {
+    int render(int startY, int startX, int windowX = 0, int windowY = 0) {
         int y = startY
 
         // Section header with tree
         def headerLine = "│"
-        setScreenCell(startX, y, headerLine, JexerTheme.createAttributes(
+        setScreenCell(startX + windowX, y + windowY, headerLine, JexerTheme.createAttributes(
             JexerTheme.getSidebarTreeColor(),
             JexerTheme.getBackgroundColor()
         ))
@@ -60,7 +60,7 @@ class SessionInfoSection {
         def titleText = "📄 ${title}"
         for (int i = 0; i < titleText.length() && i + startX + 1 < width; i++) {
             char ch = titleText.charAt(i)
-            setScreenCell(startX + i + 1, y, ch, JexerTheme.createAttributes(
+            setScreenCell(startX + i + 1 + windowX, y + windowY, ch, JexerTheme.createAttributes(
                 JexerTheme.getTextColor(),
                 JexerTheme.getBackgroundColor()
             ))
@@ -70,7 +70,7 @@ class SessionInfoSection {
 
         // Directory with tree
         def dirLine = "│"
-        setScreenCell(startX, y, dirLine, JexerTheme.createAttributes(
+        setScreenCell(startX + windowX, y + windowY, dirLine, JexerTheme.createAttributes(
             JexerTheme.getSidebarTreeColor(),
             JexerTheme.getBackgroundColor()
         ))
@@ -78,7 +78,7 @@ class SessionInfoSection {
         def dirText = "📁 ${directory}"
         for (int i = 0; i < dirText.length() && i + startX + 1 < width; i++) {
             char ch = dirText.charAt(i)
-            setScreenCell(startX + i + 1, y, ch, JexerTheme.createAttributes(
+            setScreenCell(startX + i + 1 + windowX, y + windowY, ch, JexerTheme.createAttributes(
                 JexerTheme.getTextMutedColor(),
                 JexerTheme.getBackgroundColor()
             ))
@@ -88,7 +88,7 @@ class SessionInfoSection {
 
         // Session ID with tree
         def idLine = "│"
-        setScreenCell(startX, y, idLine, JexerTheme.createAttributes(
+        setScreenCell(startX + windowX, y + windowY, idLine, JexerTheme.createAttributes(
             JexerTheme.getSidebarTreeColor(),
             JexerTheme.getBackgroundColor()
         ))
@@ -98,7 +98,7 @@ class SessionInfoSection {
         def idText = "🆔 ${shortId}"
         for (int i = 0; i < idText.length() && i + startX + 1 < width; i++) {
             char ch = idText.charAt(i)
-            setScreenCell(startX + i + 1, y, ch, JexerTheme.createAttributes(
+            setScreenCell(startX + i + 1 + windowX, y + windowY, ch, JexerTheme.createAttributes(
                 JexerTheme.getTextMutedColor(),
                 JexerTheme.getBackgroundColor()
             ))
@@ -110,7 +110,7 @@ class SessionInfoSection {
         def sepLine = "└" + "─" * (width - 2)
         for (int i = 0; i < sepLine.length(); i++) {
             char ch = sepLine.charAt(i)
-            setScreenCell(startX + i, y, ch, JexerTheme.createAttributes(
+            setScreenCell(startX + i + windowX, y + windowY, ch, JexerTheme.createAttributes(
                 JexerTheme.getSidebarBorderColor(),
                 JexerTheme.getBackgroundColor()
             ))
@@ -128,32 +128,13 @@ class SessionInfoSection {
      * Set screen cell at position.
      */
     private void setScreenCell(int x, int y, char ch, jexer.bits.CellAttributes attr) {
-        // Get the screen from the desktop
+        // Get screen from desktop
         def screen = application.getScreen()
         if (screen != null) {
-            // Convert to screen coordinates
-            int screenX = getX() + x
-            int screenY = getY() + y
-
-            // Check bounds
-            if (screenX >= 0 && screenX < screen.getWidth() &&
-                screenY >= 0 && screenY < screen.getHeight()) {
-                screen.putChar(screenX, screenY, ch, attr)
+            if (x >= 0 && x < screen.getWidth() &&
+                y >= 0 && y < screen.getHeight()) {
+                screen.putChar(x, y, ch, attr)
             }
         }
-    }
-
-    /**
-     * Get X position (to be overridden by parent).
-     */
-    int getX() {
-        return 0
-    }
-
-    /**
-     * Get Y position (to be overridden by parent).
-     */
-    int getY() {
-        return 0
     }
 }

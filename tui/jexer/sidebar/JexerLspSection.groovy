@@ -56,13 +56,13 @@ class LspSection {
      * Render section at specified Y position.
      * Returns Y position after rendering.
      */
-    int render(int startY, int startX) {
+    int render(int startY, int startX, int windowX = 0, int windowY = 0) {
         int y = startY
 
         if (lspServers.isEmpty()) {
             // No LSP servers - show message
             def headerLine = "│"
-            setScreenCell(startX, y, headerLine, JexerTheme.createAttributes(
+            setScreenCell(startX + windowX, y + windowY, headerLine, JexerTheme.createAttributes(
                 JexerTheme.getSidebarTreeColor(),
                 JexerTheme.getBackgroundColor()
             ))
@@ -70,7 +70,7 @@ class LspSection {
             def headerText = "📡 No LSP servers"
             for (int i = 0; i < headerText.length() && i + startX + 1 < width; i++) {
                 char ch = headerText.charAt(i)
-                setScreenCell(startX + i + 1, y, ch, JexerTheme.createAttributes(
+                setScreenCell(startX + i + 1 + windowX, y + windowY, ch, JexerTheme.createAttributes(
                     JexerTheme.getTextMutedColor(),
                     JexerTheme.getBackgroundColor()
                 ))
@@ -82,7 +82,7 @@ class LspSection {
             def sepLine = "└" + "─" * (width - 2)
             for (int i = 0; i < sepLine.length(); i++) {
                 char ch = sepLine.charAt(i)
-                setScreenCell(startX + i, y, ch, JexerTheme.createAttributes(
+                setScreenCell(startX + i + windowX, y + windowY, ch, JexerTheme.createAttributes(
                     JexerTheme.getSidebarBorderColor(),
                     JexerTheme.getBackgroundColor()
                 ))
@@ -98,7 +98,7 @@ class LspSection {
 
         // Section header with tree
         def headerLine = "│"
-        setScreenCell(startX, y, headerLine, JexerTheme.createAttributes(
+        setScreenCell(startX + windowX, y + windowY, headerLine, JexerTheme.createAttributes(
             JexerTheme.getSidebarTreeColor(),
             JexerTheme.getBackgroundColor()
         ))
@@ -106,7 +106,7 @@ class LspSection {
         def headerText = "📡 LSP Servers (${lspServers.size()})"
         for (int i = 0; i < headerText.length() && i + startX + 1 < width; i++) {
             char ch = headerText.charAt(i)
-            setScreenCell(startX + i + 1, y, ch, JexerTheme.createAttributes(
+            setScreenCell(startX + i + 1 + windowX, y + windowY, ch, JexerTheme.createAttributes(
                 JexerTheme.getTextColor(),
                 JexerTheme.getBackgroundColor()
             ))
@@ -125,7 +125,7 @@ class LspSection {
             def nameLine = "│  ${statusIcon} ${server.name}"
             for (int i = 0; i < nameLine.length() && i + startX + 1 < width; i++) {
                 char ch = nameLine.charAt(i)
-                setScreenCell(startX + i + 1, y, ch, JexerTheme.createAttributes(
+                setScreenCell(startX + i + 1 + windowX, y + windowY, ch, JexerTheme.createAttributes(
                     statusColor,
                     JexerTheme.getBackgroundColor()
                 ))
@@ -142,7 +142,7 @@ class LspSection {
 
                 for (int i = 0; i < diagText.length() && i + startX + 1 < width; i++) {
                     char ch = diagText.charAt(i)
-                    setScreenCell(startX + i + 1, y, ch, JexerTheme.createAttributes(
+                    setScreenCell(startX + i + 1 + windowX, y + windowY, ch, JexerTheme.createAttributes(
                         diagColor,
                         JexerTheme.getBackgroundColor()
                     ))
@@ -156,7 +156,7 @@ class LspSection {
         def sepLine = "└" + "─" * (width - 2)
         for (int i = 0; i < sepLine.length(); i++) {
             char ch = sepLine.charAt(i)
-            setScreenCell(startX + i, y, ch, JexerTheme.createAttributes(
+            setScreenCell(startX + i + windowX, y + windowY, ch, JexerTheme.createAttributes(
                 JexerTheme.getSidebarBorderColor(),
                 JexerTheme.getBackgroundColor()
             ))
@@ -176,27 +176,10 @@ class LspSection {
     private void setScreenCell(int x, int y, char ch, jexer.bits.CellAttributes attr) {
         def screen = application.getScreen()
         if (screen != null) {
-            int screenX = getX() + x
-            int screenY = getY() + y
-
-            if (screenX >= 0 && screenX < screen.getWidth() &&
-                screenY >= 0 && screenY < screen.getHeight()) {
-                screen.putChar(screenX, screenY, ch, attr)
+            if (x >= 0 && x < screen.getWidth() &&
+                y >= 0 && y < screen.getHeight()) {
+                screen.putChar(x, y, ch, attr)
             }
         }
-    }
-
-    /**
-     * Get X position (to be overridden by parent).
-     */
-    int getX() {
-        return 0
-    }
-
-    /**
-     * Get Y position (to be overridden by parent).
-     */
-    int getY() {
-        return 0
     }
 }

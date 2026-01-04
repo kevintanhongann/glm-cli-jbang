@@ -27,6 +27,9 @@ class JexerStatusBar extends TWindow {
     private int totalLines = 0
     private boolean showSidebarHint = false
 
+    // Track managed widgets for proper cleanup
+    private List<jexer.TWidget> managedWidgets = []
+
     JexerStatusBar(TApplication app, int width) {
         super(app, '', width, 1, TWindow.NOCLOSEBOX | TWindow.ABSOLUTEXY)
         buildUI()
@@ -36,22 +39,25 @@ class JexerStatusBar extends TWindow {
      * Build status bar UI.
      */
     private void buildUI() {
-        getChildren().clear()
+        // Remove managed widgets properly
+        managedWidgets.each { widget ->
+            remove(widget)
+        }
+        managedWidgets.clear()
 
         // Calculate positions
         int x = 1
         int y = 0
 
         // Model label
-        // Model label
         String modelText = "Model: ${currentModel}"
         modelLabel = new TLabel(this, modelText, x, y)
-        // modelLabel.getScreenCellAttributes().setForeColor(JexerTheme.getTextColor())
+        managedWidgets.add(modelLabel)
         x += modelText.length() + 4
 
         // Separator
         def sep1 = new TLabel(this, '|', x, y)
-        // sep1.getScreenCellAttributes().setForeColor(JexerTheme.getTextMutedColor())
+        managedWidgets.add(sep1)
         x += 3
 
         // Directory label (truncated)
@@ -60,55 +66,53 @@ class JexerStatusBar extends TWindow {
             dirName = dirName[0..12] + '...'
         }
         directoryLabel = new TLabel(this, "Dir: ${dirName}", x, y)
-        // directoryLabel.getScreenCellAttributes().setForeColor(JexerTheme.getTextMutedColor())
+        managedWidgets.add(directoryLabel)
         x += ("Dir: ${dirName}").length() + 4
 
         // Separator
         def sep2 = new TLabel(this, '|', x, y)
-        // sep2.getScreenCellAttributes().setForeColor(JexerTheme.getTextMutedColor())
+        managedWidgets.add(sep2)
         x += 3
 
         // Scroll position label (only when not at bottom)
         scrollLabel = new TLabel(this, '', x, y)
-        // scrollLabel.getScreenCellAttributes().setForeColor(JexerTheme.getTextMutedColor())
+        managedWidgets.add(scrollLabel)
         x += 20 // Reserve space
 
         // Separator
         def sep3 = new TLabel(this, '|', x, y)
-        // sep3.getScreenCellAttributes().setForeColor(JexerTheme.getTextMutedColor())
+        managedWidgets.add(sep3)
         x += 3
 
         // Shortcuts label
-        // Shortcuts label
         String shortcutsText = 'Ctrl+S:Save  Ctrl+C:Exit'
         shortcutsLabel = new TLabel(this, shortcutsText, x, y)
-        // shortcutsLabel.getScreenCellAttributes().setForeColor(JexerTheme.getTextMutedColor())
+        managedWidgets.add(shortcutsLabel)
         x += shortcutsText.length() + 4
 
         // Separator
         def sep4 = new TLabel(this, '|', x, y)
-        // sep4.getScreenCellAttributes().setForeColor(JexerTheme.getTextMutedColor())
+        managedWidgets.add(sep4)
         x += 3
 
         // Agent label
         agentLabel = new TLabel(this, currentAgent, x, y)
-        // agentLabel.getScreenCellAttributes().setForeColor(JexerTheme.getAgentBuildColor())
-        // agentLabel.getScreenCellAttributes().setBold(true)
+        managedWidgets.add(agentLabel)
 
         // Tab hint
         String tabText = ' (Tab to switch)'
         def tabLabel = new TLabel(this, tabText, x + currentAgent.length(), y)
-        // tabLabel.getScreenCellAttributes().setForeColor(JexerTheme.getTextMutedColor())
+        managedWidgets.add(tabLabel)
 
         // Sidebar hint (if enabled)
         if (showSidebarHint) {
             x += tabText.length() + 5
             def sep5 = new TLabel(this, '|', x, y)
-            // sep5.getScreenCellAttributes().setForeColor(JexerTheme.getTextMutedColor())
+            managedWidgets.add(sep5)
 
             x += 3
             def sidebarLabel = new TLabel(this, '/sidebar:Toggle', x, y)
-        // sidebarLabel.getScreenCellAttributes().setForeColor(JexerTheme.getTextMutedColor())
+            managedWidgets.add(sidebarLabel)
         }
     }
 
