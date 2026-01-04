@@ -13,6 +13,7 @@ class SidebarPanel extends Panel {
 
     private String sessionId
     private MultiWindowTextGUI textGUI
+    private int terminalWidth
 
     private SessionInfoSection sessionInfoSection
     private TokenSection tokenSection
@@ -20,7 +21,7 @@ class SidebarPanel extends Panel {
     private ModifiedFilesSection modifiedFilesSection
 
     private boolean expandedState = true
-    private final int WIDTH = 42
+    private int width
     private Panel contentPanel
     private boolean showingScrollIndicator = false
 
@@ -28,9 +29,15 @@ class SidebarPanel extends Panel {
         return expandedState
     }
 
-    SidebarPanel(MultiWindowTextGUI textGUI, String sessionId) {
+    int getWidth() {
+        return width
+    }
+
+    SidebarPanel(MultiWindowTextGUI textGUI, String sessionId, int terminalWidth) {
         this.textGUI = textGUI
         this.sessionId = sessionId
+        this.terminalWidth = terminalWidth
+        this.width = calculateSidebarWidth(terminalWidth)
 
         setLayoutManager(new LinearLayout(Direction.VERTICAL))
 
@@ -41,6 +48,16 @@ class SidebarPanel extends Panel {
         modifiedFilesSection = new ModifiedFilesSection(sessionId)
 
         buildUI()
+    }
+
+    private static int calculateSidebarWidth(int terminalWidth) {
+        if (terminalWidth >= 100) {
+            return 42
+        } else if (terminalWidth >= 80) {
+            return 32
+        } else {
+            return 0
+        }
     }
 
     private void buildUI() {
@@ -68,7 +85,7 @@ class SidebarPanel extends Panel {
             topLeft.setForegroundColor(LanternaTheme.getSidebarBorderColor())
             topBorder.addComponent(topLeft)
 
-            def topLine = new Label('─' * (WIDTH - 2))
+            def topLine = new Label('─' * (width - 2))
             topLine.setForegroundColor(LanternaTheme.getSidebarBorderColor())
             topBorder.addComponent(topLine)
 
@@ -89,7 +106,7 @@ class SidebarPanel extends Panel {
             bottomLeft.setForegroundColor(LanternaTheme.getSidebarBorderColor())
             bottomBorder.addComponent(bottomLeft)
 
-            def bottomLine = new Label('─' * (WIDTH - 2))
+            def bottomLine = new Label('─' * (width - 2))
             bottomLine.setForegroundColor(LanternaTheme.getSidebarBorderColor())
             bottomBorder.addComponent(bottomLine)
 

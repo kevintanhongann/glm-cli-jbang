@@ -8,6 +8,7 @@ import com.googlecode.lanterna.input.MouseActionType
 import com.googlecode.lanterna.TerminalSize
 import com.googlecode.lanterna.TerminalPosition
 import com.googlecode.lanterna.TerminalTextUtils
+import tui.LanternaTheme
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.nio.file.Files

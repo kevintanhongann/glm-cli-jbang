@@ -6,6 +6,7 @@ import com.googlecode.lanterna.input.KeyStroke
 import com.googlecode.lanterna.TerminalSize
 import com.googlecode.lanterna.TerminalPosition
 import tui.LanternaTUI
+import tui.LanternaTheme
 import tui.shared.AutocompleteItem
 import tui.shared.FileProvider
 import tui.shared.CommandProvider

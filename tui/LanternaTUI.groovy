@@ -330,12 +330,16 @@ class LanternaTUI {
         )
         mainContainer.addComponent(contentPanel)
 
-        // Sidebar (right) - optional
-        // Auto-hide on small terminals (< 100 columns)
+        // Sidebar (right) - responsive based on terminal width
         try {
             int terminalWidth = screen.getTerminalSize().getColumns()
-            if (sidebarEnabled && terminalWidth >= 100) {
-                sidebarPanel = new SidebarPanel(textGUI, sessionId)
+
+            if (sidebarEnabled && terminalWidth >= 80) {
+                sidebarPanel = new SidebarPanel(textGUI, sessionId, terminalWidth)
+
+                // Set fixed size for sidebar panel based on calculated width
+                sidebarPanel.setPreferredSize(new TerminalSize(sidebarPanel.getWidth(), TerminalSize.AUTOSIZE))
+
                 sidebarPanel.setLayoutData(
                     LinearLayout.createLayoutData(LinearLayout.Alignment.Center, LinearLayout.GrowPolicy.None)
                 )
