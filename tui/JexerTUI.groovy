@@ -34,11 +34,11 @@ import jexer.TWindow
 import jexer.TMessageBox
 import jexer.event.TKeypressEvent
 import jexer.bits.ColorTheme
-import tui.widgets.JexerActivityLog
-import tui.widgets.JexerCommandInput
-import tui.widgets.JexerAutocompletePopup
-import tui.widgets.JexerStatusBar
-import tui.widgets.JexerSidebar
+import tui.jexer.widgets.JexerActivityLog
+import tui.jexer.widgets.JexerCommandInput
+import tui.jexer.widgets.JexerAutocompletePopup
+import tui.jexer.widgets.JexerStatusBar
+import tui.jexer.widgets.JexerSidebar
 import static jexer.TKeypress.*
 
 /**

@@ -9,10 +9,10 @@ import picocli.CommandLine
 import picocli.CommandLine.Command
 import picocli.CommandLine.Parameters
 import picocli.CommandLine.Option
-import tui.AnsiColors
-import tui.OutputFormatter
-import tui.InteractivePrompt
-import tui.PlanPrompt
+import tui.shared.AnsiColors
+import tui.shared.OutputFormatter
+import tui.shared.InteractivePrompt
+import tui.shared.PlanPrompt
 import core.SubagentPool.AgentTask
 
 @Command(name = "plan", description = "Enter plan mode to explore codebase and create detailed plans before execution")

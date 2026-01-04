@@ -1,9 +1,9 @@
 package tools
 
 import core.FileTime
-import tui.DiffRenderer
-import tui.AnsiColors
-import tui.InteractivePrompt
+import tui.shared.DiffRenderer
+import tui.shared.AnsiColors
+import tui.shared.InteractivePrompt
 import core.LSPManager
 import core.DiagnosticFormatter
 import java.nio.file.Files

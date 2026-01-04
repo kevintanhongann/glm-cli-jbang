@@ -1,8 +1,8 @@
 package tools
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import tui.AnsiColors
-import tui.OutputFormatter
+import tui.shared.AnsiColors
+import tui.shared.OutputFormatter
 import java.util.concurrent.*
 
 class BatchTool implements Tool {

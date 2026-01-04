@@ -8,11 +8,11 @@ import tools.TaskTool
 import tools.BatchTool
 import com.fasterxml.jackson.databind.ObjectMapper
 
-import tui.AnsiColors
-import tui.DiffRenderer
-import tui.InteractivePrompt
-import tui.OutputFormatter
-import tui.ProgressIndicator
+import tui.shared.AnsiColors
+import tui.shared.DiffRenderer
+import tui.shared.InteractivePrompt
+import tui.shared.OutputFormatter
+import tui.shared.ProgressIndicator
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths

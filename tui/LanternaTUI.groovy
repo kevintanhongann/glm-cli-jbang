@@ -34,6 +34,11 @@ import rag.RAGPipeline
 import com.fasterxml.jackson.databind.ObjectMapper
 import java.nio.file.Paths
 import java.util.UUID
+import tui.lanterna.widgets.ActivityLogPanel
+import tui.lanterna.widgets.CommandInputPanel
+import tui.lanterna.widgets.SidebarPanel
+import tui.lanterna.widgets.ModelSelectionDialog
+import tui.shared.CommandProvider
 
 class LanternaTUI {
 
@@ -45,7 +50,7 @@ class LanternaTUI {
     private Panel statusBar
     private Label scrollPositionLabel
     private Label agentSwitcherLabel
-    private tui.SidebarPanel sidebarPanel
+    private SidebarPanel sidebarPanel
     private boolean sidebarEnabled = true
 
     private String currentModel
@@ -61,7 +66,7 @@ class LanternaTUI {
     private AgentRegistry agentRegistry
     private volatile boolean running = true
     private Thread sidebarRefreshThread
-    private tui.Tooltip activeTooltip
+    private tui.lanterna.widgets.Tooltip activeTooltip
 
     LanternaTUI() throws Exception {
         this.currentCwd = System.getProperty('user.dir')
@@ -330,7 +335,7 @@ class LanternaTUI {
         try {
             int terminalWidth = screen.getTerminalSize().getColumns()
             if (sidebarEnabled && terminalWidth >= 100) {
-                sidebarPanel = new tui.SidebarPanel(textGUI, sessionId)
+                sidebarPanel = new SidebarPanel(textGUI, sessionId)
                 sidebarPanel.setLayoutData(
                     LinearLayout.createLayoutData(LinearLayout.Alignment.Center, LinearLayout.GrowPolicy.None)
                 )

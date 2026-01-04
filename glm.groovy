@@ -113,40 +113,46 @@
 //SOURCES models/Session.groovy
 //SOURCES models/TokenStats.groovy
 
+// TUI sources (Shared)
+//SOURCES tui/shared/AnsiColors.groovy
+//SOURCES tui/shared/DiffRenderer.groovy
+//SOURCES tui/shared/InteractivePrompt.groovy
+//SOURCES tui/shared/ProgressIndicator.groovy
+//SOURCES tui/shared/OutputFormatter.groovy
+//SOURCES tui/shared/AutocompleteItem.groovy
+//SOURCES tui/shared/FileProvider.groovy
+//SOURCES tui/shared/CommandProvider.groovy
+//SOURCES tui/shared/PlanPrompt.groovy
+
 // TUI sources (Jexer based)
-//SOURCES tui/AnsiColors.groovy
-//SOURCES tui/DiffRenderer.groovy
-//SOURCES tui/InteractivePrompt.groovy
-//SOURCES tui/ProgressIndicator.groovy
-//SOURCES tui/OutputFormatter.groovy
+//SOURCES tui/JexerTUI.groovy
 // //SOURCES tui/JexerTUIEnhanced.groovy
 //SOURCES tui/JexerTheme.groovy
-//SOURCES tui/AutocompleteItem.groovy
-//SOURCES tui/AutocompleteField.groovy
-//SOURCES tui/AutocompletePopup.groovy
-//SOURCES tui/FileProvider.groovy
-//SOURCES tui/CommandProvider.groovy
-//SOURCES tui/widgets/JexerActivityLog.groovy
-//SOURCES tui/widgets/JexerCommandInput.groovy
-//SOURCES tui/widgets/JexerAutocompletePopup.groovy
-//SOURCES tui/widgets/JexerStatusBar.groovy
-// //SOURCES tui/widgets/JexerSidebar.groovy
-// //SOURCES tui/sidebar/JexerSessionInfoSection.groovy
-// //SOURCES tui/sidebar/JexerTokenSection.groovy
-// //SOURCES tui/sidebar/JexerLspSection.groovy
-// //SOURCES tui/sidebar/JexerModifiedFilesSection.groovy
+//SOURCES tui/jexer/widgets/JexerActivityLog.groovy
+//SOURCES tui/jexer/widgets/JexerCommandInput.groovy
+//SOURCES tui/jexer/widgets/JexerAutocompletePopup.groovy
+//SOURCES tui/jexer/widgets/JexerStatusBar.groovy
+//SOURCES tui/jexer/widgets/JexerSidebar.groovy
+//SOURCES tui/jexer/sidebar/JexerSessionInfoSection.groovy
+//SOURCES tui/jexer/sidebar/JexerTokenSection.groovy
+//SOURCES tui/jexer/sidebar/JexerLspSection.groovy
+//SOURCES tui/jexer/sidebar/JexerModifiedFilesSection.groovy
 
 // TUI sources (Lanterna based)
 //SOURCES tui/LanternaTUI.groovy
 //SOURCES tui/LanternaTheme.groovy
-//SOURCES tui/ActivityLogPanel.groovy
-//SOURCES tui/CommandInputPanel.groovy
-//SOURCES tui/LanternaAutocompletePopup.groovy
-//SOURCES tui/SidebarPanel.groovy
-//SOURCES tui/sidebar/SessionInfoSection.groovy
-// //SOURCES tui/sidebar/TokenSection.groovy
-// //SOURCES tui/sidebar/LspSection.groovy
-// //SOURCES tui/sidebar/ModifiedFilesSection.groovy
+//SOURCES tui/lanterna/widgets/ActivityLogPanel.groovy
+//SOURCES tui/lanterna/widgets/CommandInputPanel.groovy
+//SOURCES tui/lanterna/widgets/LanternaAutocompletePopup.groovy
+//SOURCES tui/lanterna/widgets/AutocompleteField.groovy
+//SOURCES tui/lanterna/widgets/AutocompletePopup.groovy
+//SOURCES tui/lanterna/widgets/SidebarPanel.groovy
+//SOURCES tui/lanterna/widgets/ModelSelectionDialog.groovy
+//SOURCES tui/lanterna/widgets/Tooltip.groovy
+//SOURCES tui/lanterna/sidebar/SessionInfoSection.groovy
+//SOURCES tui/lanterna/sidebar/TokenSection.groovy
+//SOURCES tui/lanterna/sidebar/LspSection.groovy
+//SOURCES tui/lanterna/sidebar/ModifiedFilesSection.groovy
 //
 //// LSP sources
 //SOURCES models/Diagnostic.groovy

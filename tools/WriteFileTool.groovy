@@ -4,8 +4,8 @@ import core.LSPManager
 import core.DiagnosticFormatter
 import core.SessionStatsManager
 import core.FileTime
-import tui.DiffRenderer
-import tui.AnsiColors
+import tui.shared.DiffRenderer
+import tui.shared.AnsiColors
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths

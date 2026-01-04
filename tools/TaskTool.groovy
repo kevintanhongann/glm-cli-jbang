@@ -2,8 +2,8 @@ package tools
 
 import core.SubagentPool
 import core.AgentConfig
-import tui.AnsiColors
-import tui.OutputFormatter
+import tui.shared.AnsiColors
+import tui.shared.OutputFormatter
 
 class TaskTool implements Tool {
     private final SubagentPool pool

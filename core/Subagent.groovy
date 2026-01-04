@@ -6,8 +6,8 @@ import models.Message
 import models.ChatRequest
 import models.ChatResponse
 import com.fasterxml.jackson.databind.ObjectMapper
-import tui.AnsiColors
-import tui.OutputFormatter
+import tui.shared.AnsiColors
+import tui.shared.OutputFormatter
 
 @Canonical
 class Subagent {

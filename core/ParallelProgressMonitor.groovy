@@ -1,6 +1,6 @@
 package core
 
-import tui.AnsiColors
+import tui.shared.AnsiColors
 
 /**
  * Provides visual feedback during parallel tool execution.
