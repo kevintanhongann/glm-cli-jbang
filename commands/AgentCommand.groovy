@@ -9,6 +9,10 @@ import core.Config
 import tools.ReadFileTool
 import tools.WriteFileTool
 import tools.ListFilesTool
+import tools.EditTool
+import tools.MultiEditTool
+import tools.PatchTool
+import tools.LSPTool
 import tools.WebSearchTool
 import tools.CodeSearchTool
 import tools.GrepTool
@@ -57,6 +61,10 @@ class AgentCommand implements Runnable {
         agent.registerTool(new ReadFileTool())
         agent.registerTool(new WriteFileTool())
         agent.registerTool(new ListFilesTool())
+        agent.registerTool(new EditTool())
+        agent.registerTool(new MultiEditTool())
+        agent.registerTool(new PatchTool())
+        agent.registerTool(new LSPTool())
         agent.registerTool(new GrepTool())
         agent.registerTool(new GlobTool())
         agent.registerTool(new BashTool())

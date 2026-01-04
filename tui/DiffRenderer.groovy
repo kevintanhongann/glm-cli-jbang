@@ -65,7 +65,7 @@ class DiffRenderer {
         return output.toString()
     }
     
-    private static List<DiffLine> computeDiff(List<String> origLines, List<String> modLines) {
+    public static List<DiffLine> computeDiff(List<String> origLines, List<String> modLines) {
         List<DiffLine> result = []
         
         // Simple LCS-based diff

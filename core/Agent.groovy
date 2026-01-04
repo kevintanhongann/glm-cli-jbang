@@ -54,7 +54,7 @@ class Agent {
     private BatchTool batchTool
 
     Agent(String apiKey, String model, String sessionId = null) {
-        this.client = new GlmClient(apiKey)
+        this.client = new GlmClient(apiKey, null, 'jwt')
         this.model = model
         this.config = Config.load()
         this.subagentPool = new SubagentPool(client, tools)
@@ -88,6 +88,7 @@ class Agent {
         subagentPool?.shutdown()
         parallelExecutor?.shutdown()
         batchTool?.shutdown()
+        sessionManager?.shutdown()
     }
 
     /**

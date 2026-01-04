@@ -67,7 +67,8 @@ batch(tools: [
 - Max 10 tools per batch
 - No tool interdependencies
 - All tools must be registered
-""".stripIndent().trim()
+- Cannot batch itself (recursion disallowed)
+ """.stripIndent().trim()
     }
 
     @Override
@@ -114,6 +115,12 @@ batch(tools: [
 
         if (toolsList.isEmpty()) {
             return 'Error: At least one tool must be specified'
+        }
+
+        // Check for recursion (batch tool cannot batch itself)
+        def hasRecursiveBatch = toolsList.any { it.get('name') == 'batch' }
+        if (hasRecursiveBatch) {
+            return 'Error: batch tool cannot be called recursively within a batch'
         }
 
         OutputFormatter.printInfo("Executing ${AnsiColors.bold(toolsList.size().toString())} tools in parallel...")

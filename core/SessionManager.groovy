@@ -8,6 +8,20 @@ import java.nio.file.Files
 class SessionManager {
     private Sql database
     private static final String DB_PATH = System.getProperty("user.home") + "/.glm/sessions"
+    private static boolean shutdownHookRegistered = false
+
+    static {
+        registerShutdownHook()
+    }
+
+    private static void registerShutdownHook() {
+        if (!shutdownHookRegistered) {
+            Runtime.runtime.addShutdownHook(new Thread({
+                SessionManager.instance?.shutdown()
+            }))
+            shutdownHookRegistered = true
+        }
+    }
 
     SessionManager() {
         initializeDatabase()
@@ -205,7 +219,11 @@ class SessionManager {
     }
 
     void shutdown() {
-        database?.close()
+        try {
+            database?.close()
+        } catch (Exception e) {
+            System.err.println("Error closing database: ${e.message}")
+        }
     }
 
     private String generateSessionId() {

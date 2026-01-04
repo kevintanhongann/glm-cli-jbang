@@ -12,6 +12,7 @@ import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 
 class GlmClient {
+
     private static final long EXPIRATION_SECONDS = 3600 // 1 hour
     private static final long CACHE_TTL_SECONDS = 3500 // Slightly less than expiration
 
@@ -20,7 +21,7 @@ class GlmClient {
     private final String authType
     private final HttpClient client
     private final ObjectMapper mapper
-    
+
     private String cachedToken
     private long tokenExpiryTime = 0
 
@@ -57,7 +58,7 @@ class GlmClient {
 
         this.apiKey = credential.key
         this.baseUrl = providerInfo.endpoint
-        this.authType = providerInfo.authType ?: "bearer"
+        this.authType = providerInfo.authType ?: 'bearer'
         this.client = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .build()
@@ -66,17 +67,17 @@ class GlmClient {
 
     private static String loadApiKey() {
         def config = Config.load()
-        
+
         if (config.api?.key) {
             return config.api.key
         }
 
-        def credential = Auth.get("zai")
+        def credential = Auth.get('zai')
         if (credential != null) {
             return credential.key
         }
 
-        def envVar = System.getenv("ZAI_API_KEY")
+        def envVar = System.getenv('ZAI_API_KEY')
         if (envVar != null) {
             return envVar
         }
@@ -86,26 +87,26 @@ class GlmClient {
 
     private static String loadBaseUrl() {
         def config = Config.load()
-        
+
         if (config.api?.baseUrl) {
             return config.api.baseUrl
         }
 
-        return "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+        return 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
     }
 
     private static String loadAuthType() {
         def config = Config.load()
-        
+
         if (config.api?.baseUrl) {
-            return "bearer"
+            return 'bearer'
         }
 
-        return "jwt"
+        return 'jwt'
     }
 
     private synchronized String getAuthToken() {
-        if (authType == "jwt") {
+        if (authType == 'jwt') {
             return getJwtToken()
         } else {
             return apiKey
@@ -120,23 +121,23 @@ class GlmClient {
 
         String[] parts = apiKey.split("\\.")
         if (parts.length != 2) {
-            throw new IllegalArgumentException("Invalid API Key format for JWT auth")
+            throw new IllegalArgumentException('Invalid API Key format for JWT auth')
         }
 
         String id = parts[0]
         String secret = parts[1]
 
         Algorithm algorithm = Algorithm.HMAC256(secret.getBytes(StandardCharsets.UTF_8))
-        
+
         Map<String, Object> headerClaims = new HashMap<>()
-        headerClaims.put("alg", "HS256")
-        headerClaims.put("sign_type", "SIGN")
+        headerClaims.put('alg', 'HS256')
+        headerClaims.put('sign_type', 'SIGN')
 
         cachedToken = JWT.create()
             .withHeader(headerClaims)
-            .withClaim("api_key", id)
+            .withClaim('api_key', id)
             .withExpiresAt(new Date(now + EXPIRATION_SECONDS * 1000))
-            .withClaim("timestamp", now)
+            .withClaim('timestamp', now)
             .sign(algorithm)
 
         tokenExpiryTime = now + (CACHE_TTL_SECONDS * 1000)
@@ -150,15 +151,16 @@ class GlmClient {
 
         HttpRequest httpRequest = HttpRequest.newBuilder()
             .uri(URI.create(baseUrl))
-            .header("Authorization", "Bearer " + token)
-            .header("Content-Type", "application/json")
+            .header('Authorization', 'Bearer ' + token)
+            .header('Content-Type', 'application/json')
             .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
             .build()
 
         HttpResponse<String> response = client.send(httpRequest, HttpResponse.BodyHandlers.ofString())
 
         if (response.statusCode() != 200) {
-             throw new RuntimeException("API Request failed with code ${response.statusCode()}: ${response.body()}")
+            System.err.println('Request Body: ' + jsonBody)
+            throw new RuntimeException("API Request failed with code ${response.statusCode()}: ${response.body()}")
         }
 
         return response.body()
@@ -171,8 +173,8 @@ class GlmClient {
 
         HttpRequest httpRequest = HttpRequest.newBuilder()
             .uri(URI.create(baseUrl))
-            .header("Authorization", "Bearer " + token)
-            .header("Content-Type", "application/json")
+            .header('Authorization', 'Bearer ' + token)
+            .header('Content-Type', 'application/json')
             .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
             .build()
 
@@ -182,22 +184,23 @@ class GlmClient {
                     // Ideally read body to get error, but streaming response body is a stream
                     throw new RuntimeException("API Request failed with code ${response.statusCode()}")
                 }
-                
+
                 response.body().forEach { line ->
-                    if (line.startsWith("data:")) {
+                    if (line.startsWith('data:')) {
                         String data = line.substring(5).trim()
-                        if (data == "[DONE]") {
+                        if (data == '[DONE]') {
                             return
                         }
                         try {
                             def chatResponse = mapper.readValue(data, models.ChatResponse.class)
                             onChunk.call(chatResponse)
                         } catch (Exception e) {
-                            // Ignore parsing errors for empty lines or keepalives
+                        // Ignore parsing errors for empty lines or keepalives
                         }
                     }
                 }
             }
             .join() // Wait for completion
     }
+
 }

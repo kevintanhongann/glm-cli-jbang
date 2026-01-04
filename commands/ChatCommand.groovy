@@ -128,6 +128,7 @@ class ChatCommand implements Runnable {
             String input = scanner.nextLine().trim()
 
             if (input.equalsIgnoreCase("exit") || input.equalsIgnoreCase("quit")) {
+                sessionManager?.shutdown()
                 break
             }
             if (input.isEmpty()) continue

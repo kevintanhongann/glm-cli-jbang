@@ -89,7 +89,12 @@ class JexerTUIEnhanced {
      */
     void start(String model = 'opencode/big-pickle', String cwd = null) {
         this.currentModel = model
-        this.sessionId = UUID.randomUUID().toString()
+        // Create a proper session in the database to satisfy FK constraints for token_stats
+        this.sessionId = core.SessionManager.instance.createSession(
+            currentCwd ?: System.getProperty('user.dir'),
+            'BUILD',
+            model
+        )
 
         def parts = model.split('/', 2)
         if (parts.length == 2) {

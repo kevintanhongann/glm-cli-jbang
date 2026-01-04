@@ -17,6 +17,9 @@
 // Jackson for config parsing
 //DEPS com.fasterxml.jackson.dataformat:jackson-dataformat-toml:2.15.2
 
+// Java Diff Utils for patch operations
+//DEPS io.github.java-diff-utils:java-diff-utils:4.12
+
 // RAG Dependencies
 //DEPS dev.langchain4j:langchain4j-easy-rag:1.0.0-beta2
 //DEPS dev.langchain4j:langchain4j-embeddings-bge-small-en-v15-q:1.0.0-beta2
@@ -92,12 +95,17 @@
 //SOURCES tools/GrepTool.groovy
 //SOURCES tools/GlobTool.groovy
 //SOURCES tools/BatchTool.groovy
+//SOURCES tools/EditTool.groovy
+//SOURCES tools/MultiEditTool.groovy
+//SOURCES tools/PatchTool.groovy
+//SOURCES tools/LSPTool.groovy
 
 // Agent source
 //SOURCES core/Agent.groovy
 //SOURCES core/SessionManager.groovy
 //SOURCES core/MessageStore.groovy
 //SOURCES core/TokenTracker.groovy
+//SOURCES core/FileTime.groovy
 //SOURCES core/ParallelExecutor.groovy
 //SOURCES core/ParallelProgressMonitor.groovy
 

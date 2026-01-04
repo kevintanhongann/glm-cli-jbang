@@ -15,24 +15,26 @@ Tools are the primary mechanism by which the agent interacts with your codebase.
 
 ### read_file
 
-**Purpose**: Read the content of a file at a specified path.
+**Purpose**: Read the complete contents of a file from the local filesystem.
 
 **Permission Level**: Always allowed
 
 #### Parameters
 
-| Name | Type | Required | Description |
-|------|-------|-----------|-------------|
-| `path` | string | Yes | The path to the file to read |
+| Name | Type | Required | Default | Description |
+|------|-------|-----------|---------|-------------|
+| `path` | string | Yes | - | Absolute file path to read |
+| `offset` | integer | No | 0 | Line number to start reading from (0-based) |
+| `limit` | integer | No | all | Number of lines to read (max 2000) |
 
 #### Examples
 
 ```groovy
-// Read a Groovy file
+// Read entire file
 read_file(path: "src/main.groovy")
 
-// Read a README
-read_file(path: "README.md")
+// Read with pagination
+read_file(path: "README.md", offset: 100, limit: 50)
 
 // Read a nested file
 read_file(path: "models/ChatRequest.groovy")
@@ -40,33 +42,72 @@ read_file(path: "models/ChatRequest.groovy")
 
 #### Returns
 
-**Success**: File content as string
+**Success**: File content with line numbers
 ```
-Successfully read 123 lines from src/main.groovy
-class Main {
-    static void main(String[] args) {
-        println("Hello, World!")
-    }
-}
+Showing lines 1-10 of 50 total
+
+    1	class Main {
+    2	    static void main(String[] args) {
+    3	        println("Hello, World!")
+    4	    }
+    5	}
+```
+
+**Image file**:
+```
+Image file: screenshots/example.png
+
+This is an image file (image/png). It has been attached as base64 data.
+
+Data URL: data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA... (truncated)
+
+Image dimensions and metadata can be extracted using bash tool with 'file' or 'identify' commands.
+```
+
+**PDF file**:
+```
+PDF file: docs/manual.pdf
+
+This is a PDF document (145.32 KB). It has been attached as base64 data.
+
+Data URL: data:application/pdf;base64,JVBERi0xLjQK... (truncated)
+
+For PDF text extraction, use bash tool with 'pdftotext' or 'pdf2txt' commands.
+```
+
+**Binary file blocked**:
+```
+Binary file detected: archive.zip
+
+File exists but cannot be displayed. Binary files (archives, executables, media, etc.) are blocked for safety.
 ```
 
 **Error**: Clear error message
 ```
-Error: File not found at src/nonexistent.groovy
+Error: File not found: src/nonexistent.groovy
+
+Suggestion: Use glob to find the file or check the path.
 ```
 
-**Partial Success**: Content with truncation notice
+**Pagination**:
 ```
-Read 45 lines (file truncated at 1000 lines limit)
-[content truncated...]
+Showing lines 100-150 of 500 total
+    100	// More code here
+    101	def anotherFunction() {
+...
+... 350 more lines (use offset=150 to continue)
 ```
 
 #### Implementation Details
 
-- Uses `Files.readString()` from `java.nio.file`
-- Returns error if file doesn't exist
-- No line limit (full file returned)
-- Supports all text file formats
+- Uses `Files.readAllLines()` for text files
+- Returns content in cat -n format with line numbers
+- Binary file detection by extension and content analysis
+- Image/PDF support with base64 encoding
+- Maximum 2000 lines per read (pagination supported)
+- Lines longer than 2000 characters are truncated
+- Tracks file reads for concurrent modification detection
+- Blocked binary extensions: zip, tar, gz, exe, dll, so, jar, class, etc.
 
 #### Use Cases
 
@@ -74,6 +115,8 @@ Read 45 lines (file truncated at 1000 lines limit)
 - Checking configuration files
 - Reviewing documentation
 - Examining test files
+- Viewing image files
+- Accessing PDF documents
 
 ---
 
@@ -174,7 +217,7 @@ safety_mode = "ask"        # Ask before each write (default)
 
 ### list_files
 
-**Purpose**: List the contents of a directory.
+**Purpose**: List the contents of a directory in tree format with optional recursive search.
 
 **Permission Level**: Always allowed
 
@@ -182,53 +225,50 @@ safety_mode = "ask"        # Ask before each write (default)
 
 | Name | Type | Required | Default | Description |
 |------|-------|-----------|---------|-------------|
-| `directory` | string | Yes | - | The directory path to list |
-| `recursive` | boolean | No | false | Whether to list files recursively |
+| `path` | string | No | . | Directory path to list |
+| `recursive` | boolean | No | false | List files recursively |
 
 #### Examples
 
 ```groovy
-// List current directory
-list_files(directory: ".")
+// List current directory (tree format)
+list_files(path: ".")
 
-// List with recursion
-list_files(directory: "src", recursive: true)
+// List recursively
+list_files(path: "src", recursive: true)
 
 // List specific subdirectory
-list_files(directory: "models/")
+list_files(path: "models/")
 ```
 
 #### Returns
 
-**Flat directory listing**:
+**Non-recursive tree listing**:
 ```
-commands/
-core/
-models/
-tools/
-glm.groovy
-README.md
+└── 📁 commands/
+    📄 GlmCli.groovy
+    📄 ChatCommand.groovy
+    📄 AgentCommand.groovy
+└── 📁 core/
+    📄 Agent.groovy
+    📄 Config.groovy
+    📄 GlmClient.groovy
+└── 📄 glm.groovy
+└── 📄 README.md
 ```
 
-**Recursive listing**:
+**Recursive tree listing**:
 ```
-commands/
-  GlmCli.groovy
-  ChatCommand.groovy
-  AgentCommand.groovy
-core/
-  Agent.groovy
-  Config.groovy
-  GlmClient.groovy
-models/
-  ChatRequest.groovy
-  ChatResponse.groovy
-  Message.groovy
-tools/
-  Tool.groovy
-  ReadFileTool.groovy
-  WriteFileTool.groovy
-  ListFilesTool.groovy
+└── 📁 commands/
+    └── 📄 GlmCli.groovy
+    └── 📄 ChatCommand.groovy
+    └── 📄 AgentCommand.groovy
+└── 📁 core/
+    └── 📄 Agent.groovy
+    └── 📁 models/
+        └── 📄 ChatRequest.groovy
+        └── 📄 ChatResponse.groovy
+    └── 📄 Config.groovy
 ```
 
 **Error**: Clear error message
@@ -238,10 +278,12 @@ Error: Directory not found: /invalid/path
 
 #### Implementation Details
 
-- Uses `Files.list()` for non-recursive
-- Uses `Files.walk()` for recursive
-- Sorted output for consistency
-- Returns subdirectories and files
+- Uses `Files.walk()` with depth control
+- Tree-style formatting with indentation
+- Automatically ignores common directories: node_modules, .git, .svn, .hg, dist, build, target, out
+- Sorts: directories before files, alphabetically within each group
+- Maximum 100 files displayed (shows truncation message if exceeded)
+- Emoji icons: 📁 for directories, 📄 for files
 
 #### Use Cases
 
@@ -250,6 +292,329 @@ Error: Directory not found: /invalid/path
 - Understanding directory layout
 - Locating test files
 - Checking for generated files
+
+---
+
+### edit
+
+**Purpose**: Performs precise string replacements in files with multiple matching strategies.
+
+**Permission Level**: Requires user confirmation (safety check)
+
+#### Parameters
+
+| Name | Type | Required | Default | Description |
+|------|-------|-----------|---------|-------------|
+| `filePath` | string | Yes | - | Absolute path to the file to modify |
+| `oldString` | string | Yes | - | Text to replace |
+| `newString` | string | Yes | - | Text to replace it with (must be different from oldString) |
+| `replaceAll` | boolean | No | false | Replace all occurrences of oldString |
+
+#### Examples
+
+```groovy
+// Simple exact match replacement
+edit(
+    filePath: "src/User.groovy",
+    oldString: "private String name",
+    newString: "private String username"
+)
+
+// Replace all occurrences
+edit(
+    filePath: "config.properties",
+    oldString: "localhost",
+    newString: "production.example.com",
+    replaceAll: true
+)
+```
+
+#### Matching Strategies
+
+The tool tries multiple strategies in order:
+
+1. **Simple** - Exact string match
+2. **LineTrimmed** - Ignores line indentation
+3. **WhitespaceNormalized** - Normalizes spaces and tabs
+4. **IndentationFlexible** - Removes consistent indentation
+
+#### Safety Features
+
+1. **Diff Preview**: Shows changes before applying
+2. **User Confirmation**: Requires explicit Y/n approval
+3. **Multiple Strategies**: Tries different matching approaches
+4. **Concurrent Modification Check**: Prevents lost updates
+
+#### Returns
+
+**Success**: Number of lines changed
+```
+Successfully edited src/User.groovy: 1 line changed
+```
+
+**Error**: Matching failure
+```
+Error: oldString not found in file. Tried Simple and LineTrimmed strategies.
+```
+
+#### Use Cases
+
+- Updating function implementations
+- Modifying configuration values
+- Refactoring specific code sections
+- Making targeted edits
+
+---
+
+### multiedit
+
+**Purpose**: Performs multiple edits to a single file atomically.
+
+**Permission Level**: Requires user confirmation (safety check)
+
+#### Parameters
+
+| Name | Type | Required | Description |
+|------|-------|-----------|-------------|
+| `filePath` | string | Yes | Absolute path to the file to modify |
+| `edits` | array | Yes | Array of edit operations (each with oldString, newString, replaceAll) |
+
+#### Examples
+
+```groovy
+// Multiple related edits
+multiedit(
+    filePath: "src/User.groovy",
+    edits: [
+        [oldString: "private String name", newString: "private String username"],
+        [oldString: "public String getName()", newString: "public String getUsername()"],
+        [oldString: "this.name", newString: "this.username"]
+    ]
+)
+```
+
+#### Behavior
+
+- All edits must succeed or none are applied (atomic)
+- Edits are applied sequentially in the order provided
+- Uses same matching strategies as edit tool
+
+#### Safety Features
+
+1. **Atomic Operations**: All edits succeed or none
+2. **Validation**: Checks all edits before applying
+3. **Diff Preview**: Shows all changes together
+4. **User Confirmation**: Single approval for all edits
+
+#### Returns
+
+**Success**: Summary of edits applied
+```
+Successfully applied 3 edits to src/User.groovy (5 total lines changed)
+```
+
+**Error**: Edit failure
+```
+Error: Edit 2 - oldString not found. No changes were applied.
+```
+
+#### Use Cases
+
+- Refactoring with multiple related changes
+- Batch updating similar code patterns
+- Complex multi-part modifications
+
+---
+
+### patch
+
+**Purpose**: Applies a unified diff patch to modify multiple files.
+
+**Permission Level**: Requires user confirmation (safety check)
+
+#### Parameters
+
+| Name | Type | Required | Description |
+|------|-------|-----------|-------------|
+| `patchText` | string | Yes | Full patch text in unified diff format |
+
+#### Examples
+
+```groovy
+// Apply a git diff
+patch(
+    patchText: '''--- a/file.txt
++++ b/file.txt
+@@ -1,3 +1,4 @@
+ old line
++new line'''
+)
+```
+
+#### Supported Operations
+
+- **add**: Create new files
+- **update**: Modify existing files
+- **delete**: Remove files
+- **move**: Rename/move files
+
+#### Safety Features
+
+1. **Preview**: Shows summary before applying
+2. **User Confirmation**: Explicit approval required
+3. **Multi-file Safety**: Tracks all file changes
+4. **Rollback**: No changes if any operation fails
+
+#### Returns
+
+**Success**: Summary of applied changes
+```
+Successfully applied patch to 3 file(s):
+  📝 add: src/NewFeature.groovy (25 lines)
+  ✏️ update: src/Existing.groovy (5 lines)
+  🗑️ delete: src/Old.groovy
+```
+
+**Error**: Parse or application failure
+```
+Error: Some patch operations failed.
+
+src/missing.groovy: File not found
+```
+
+#### Use Cases
+
+- Applying git diff output
+- Reverting changes from patches
+- Applying changes from external tools
+- Bulk multi-file modifications
+
+---
+
+### lsp
+
+**Purpose**: Language Server Protocol operations for code intelligence.
+
+**Permission Level**: Always allowed
+
+#### Parameters
+
+| Name | Type | Required | Description |
+|------|-------|-----------|-------------|
+| `operation` | string | Yes | LSP operation (goToDefinition, findReferences, hover, documentSymbol, workspaceSymbol) |
+| `filePath` | string | Yes | Absolute path to the file |
+| `position` | object | No* | Cursor position with line and character (0-indexed) |
+| `query` | string | No* | Search query (for workspaceSymbol) |
+
+* Required for specific operations (see below)
+
+#### Examples
+
+```groovy
+// Find where symbol is defined
+lsp(
+    operation: "goToDefinition",
+    filePath: "src/User.groovy",
+    position: [line: 10, character: 5]
+)
+
+// Find all references
+lsp(
+    operation: "findReferences",
+    filePath: "src/User.groovy",
+    position: [line: 10, character: 5]
+)
+
+// Get documentation
+lsp(
+    operation: "hover",
+    filePath: "src/User.groovy",
+    position: [line: 10, character: 5]
+)
+
+// List symbols in file
+lsp(
+    operation: "documentSymbol",
+    filePath: "src/User.groovy"
+)
+
+// Search workspace
+lsp(
+    operation: "workspaceSymbol",
+    filePath: "src/User.groovy",
+    query: "UserService"
+)
+```
+
+#### Supported Operations
+
+| Operation | Required Params | Description |
+|-----------|----------------|-------------|
+| `goToDefinition` | position | Find where a symbol is defined |
+| `findReferences` | position | Find all usages of a symbol |
+| `hover` | position | Get documentation and type information |
+| `documentSymbol` | none | Get all symbols in current file |
+| `workspaceSymbol` | query | Search symbols across all files |
+
+#### Requirements
+
+- LSP must be enabled in configuration
+- Language server must be configured for the file type
+- File must be part of a valid project
+
+#### Returns
+
+**goToDefinition**:
+```
+Found 1 definition(s):
+
+1. file:///home/user/src/UserService.groovy at line 5
+```
+
+**findReferences**:
+```
+Found 3 reference(s):
+
+1. file:///home/user/src/Controller.groovy at line 20
+2. file:///home/user/src/Service.groovy at line 15
+3. file:///home/user/src/Tests.groovy at line 8
+```
+
+**hover**:
+```
+Returns the full class documentation with type information, parameters, and return values.
+```
+
+**documentSymbol**:
+```
+Found 8 symbol(s) in file:
+
+  class UserService (line 5)
+  private String id (line 7)
+  public void createUser() (line 10)
+  public void deleteUser() (line 15)
+```
+
+**workspaceSymbol**:
+```
+Found 5 symbol(s) matching 'UserService':
+
+1. UserService in models (class)
+   File: file:///home/user/src/UserService.groovy at line 5
+```
+
+**Error**:
+```
+Error: No LSP server available for this file type. Check your LSP configuration.
+```
+
+#### Use Cases
+
+- Understanding code navigation
+- Finding symbol usage across codebase
+- Getting inline documentation
+- Exploring code structure
+- Quick symbol lookup
 
 ---
 
