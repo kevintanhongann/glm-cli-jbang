@@ -56,7 +56,7 @@ class Config {
         @JsonProperty('default_model')
         String defaultModel = 'zai/glm-4-flash'
         @JsonProperty('max_steps')
-        Integer maxSteps = null  // null = unlimited
+        Integer maxSteps = 25  // Default: 25 steps (null = unlimited)
         @JsonProperty('recent_models')
         List<String> recentModels = []
         @JsonProperty('favorite_models')

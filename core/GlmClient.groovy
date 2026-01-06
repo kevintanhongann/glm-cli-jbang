@@ -203,4 +203,51 @@ class GlmClient {
             .join() // Wait for completion
     }
 
+    void streamMessageForTUI(ChatRequest request, Closure onChunk, Closure onComplete = {}) {
+        request.stream = true
+        String jsonBody = mapper.writeValueAsString(request)
+        String token = getAuthToken()
+
+        HttpRequest httpRequest = HttpRequest.newBuilder()
+            .uri(URI.create(baseUrl))
+            .header('Authorization', 'Bearer ' + token)
+            .header('Content-Type', 'application/json')
+            .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+            .build()
+
+        StringBuilder fullResponse = new StringBuilder()
+        
+        client.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofLines())
+            .thenAccept { response ->
+                if (response.statusCode() != 200) {
+                    throw new RuntimeException("API Request failed with code ${response.statusCode()}")
+                }
+
+                response.body().forEach { line ->
+                    if (line.startsWith('data:')) {
+                        String data = line.substring(5).trim()
+                        if (data == '[DONE]') {
+                            return
+                        }
+                        try {
+                            def chatResponse = mapper.readValue(data, models.ChatResponse.class)
+                            if (chatResponse.choices && !chatResponse.choices.isEmpty()) {
+                                def delta = chatResponse.choices[0].delta
+                                if (delta?.content) {
+                                    onChunk.call(delta.content)
+                                    fullResponse.append(delta.content)
+                                }
+                            }
+                        } catch (Exception e) {
+                            // Ignore parsing errors for empty lines or keepalives
+                        }
+                    }
+                }
+                
+                // Call completion callback with full response
+                onComplete.call(fullResponse.toString())
+            }
+            .join() // Wait for completion
+    }
+
 }

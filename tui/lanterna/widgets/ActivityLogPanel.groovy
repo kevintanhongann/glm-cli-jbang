@@ -13,6 +13,7 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.nio.file.Files
 import java.nio.file.Paths as NioPaths
+import java.util.Timer
 
 /**
  * Custom TextBox that extends standard TextBox with scroll callbacks and save support.
@@ -163,7 +164,7 @@ class ActivityLogPanel {
             return text
         }
         def lines = text.split('\n')
-        def wrapped = TerminalTextUtils.getWordWrappedText(maxWidth, *lines)
+        def wrapped = TerminalTextUtils.getWordWrappedText(maxWidth, lines)
         return wrapped.join('\n')
     }
 
@@ -362,9 +363,124 @@ class ActivityLogPanel {
         updateDisplay()
     }
 
+    // Streaming support methods
+    private boolean streamingMode = false
+    private StringBuilder currentStream = new StringBuilder()
+    private Timer updateTimer
+    private boolean updatePending = false
+    private boolean insideThinkTag = false
+
+    void startStreamingResponse() {
+        synchronized (content) {
+            streamingMode = true
+            currentStream = new StringBuilder()
+            insideThinkTag = false
+            content.append('GLM> ')
+        }
+        updateDisplay()
+    }
+
+    void appendStreamChunk(String chunk) {
+        synchronized (content) {
+            // Filter out <think> tags and their content
+            String filtered = filterThinkingTags(chunk)
+            if (filtered) {
+                currentStream.append(filtered)
+                content.append(filtered)
+            }
+        }
+        debouncedUpdateDisplay()
+    }
+
+    /**
+     * Filter out <think>...</think> tags from streamed content.
+     * Handles partial tags across chunk boundaries.
+     */
+    private String filterThinkingTags(String chunk) {
+        StringBuilder result = new StringBuilder()
+        int i = 0
+
+        while (i < chunk.length()) {
+            if (insideThinkTag) {
+                // Look for closing </think>
+                int closeIdx = chunk.indexOf('</think>', i)
+                if (closeIdx >= 0) {
+                    insideThinkTag = false
+                    i = closeIdx + 8 // Skip past </think>
+                } else {
+                    // Still inside think tag, skip rest of chunk
+                    break
+                }
+            } else {
+                // Look for opening <think>
+                int openIdx = chunk.indexOf('<think>', i)
+                if (openIdx >= 0) {
+                    // Append content before <think>
+                    result.append(chunk.substring(i, openIdx))
+                    insideThinkTag = true
+                    i = openIdx + 7 // Skip past <think>
+                } else {
+                    // No more think tags, append rest
+                    result.append(chunk.substring(i))
+                    break
+                }
+            }
+        }
+
+        return result.toString()
+    }
+
+    void finishStreamingResponse() {
+        synchronized (content) {
+            streamingMode = false
+            insideThinkTag = false
+            content.append('\n')
+        }
+        updateDisplay()
+    }
+
+    private void debouncedUpdateDisplay() {
+        if (updatePending) return
+
+        updatePending = true
+        if (updateTimer != null) {
+            updateTimer.cancel()
+        }
+        updateTimer = new Timer()
+        updateTimer.schedule({
+            synchronized (content) {
+                updateDisplayInternal()
+                updatePending = false
+            }
+        } as java.util.TimerTask, 50) // 50ms debounce for performance
+    }
+
+    private void updateDisplayInternal() {
+        if (textGUI != null && textGUI.getGUIThread() != null) {
+            textGUI.getGUIThread().invokeLater(() -> {
+                synchronized (content) {
+                    int maxWidth = textBox.getSize().getColumns()
+                    String wrappedContent = wrapText(content.toString(), maxWidth)
+                    textBox.setText(wrappedContent)
+                    textBox.scrollToBottom()
+                    textBox.invalidate()
+                }
+            })
+        } else {
+            synchronized (content) {
+                int maxWidth = textBox.getSize().getColumns()
+                String wrappedContent = wrapText(content.toString(), maxWidth)
+                textBox.setText(wrappedContent)
+                textBox.scrollToBottom()
+                textBox.invalidate()
+            }
+        }
+    }
+
     void clear() {
         synchronized (content) {
             content = new StringBuilder()
+            insideThinkTag = false
         }
         updateDisplay()
     }

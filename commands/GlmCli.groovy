@@ -5,6 +5,7 @@ import picocli.CommandLine.Command
 import picocli.CommandLine.Option
 import tui.LanternaTUI
 import tui.JexerTUI
+import tui.Tui4jTUI
 
 @Command(name = 'glm', mixinStandardHelpOptions = true, version = 'glm-cli 1.0.0',
         description = 'GLM-4 based AI coding agent',
@@ -33,6 +34,10 @@ class GlmCli implements Runnable {
                     case 'jexer':
                         JexerTUI jexerTui = new JexerTUI()
                         jexerTui.start(model, System.getProperty('user.dir'))
+                        break
+                    case 'tui4j':
+                        Tui4jTUI tui4jTui = new Tui4jTUI()
+                        tui4jTui.start(model, System.getProperty('user.dir'))
                         break
                     case 'lanterna':
                     default:

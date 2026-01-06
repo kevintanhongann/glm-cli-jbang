@@ -711,7 +711,8 @@ class JexerTUI extends TApplication {
 
         messages << new Message('user', userInput)
 
-        int maxIterations = 10
+        // Get max steps from config (default 25, or unlimited if null)
+        int maxIterations = config.behavior?.maxSteps ?: 25
         int iteration = 0
 
         // Filter tools based on agent type
@@ -724,6 +725,15 @@ class JexerTUI extends TApplication {
 
         while (iteration < maxIterations) {
             iteration++
+            
+            // Check if this is the last step
+            boolean isLastStep = (iteration >= maxIterations - 1)
+            
+            // At 80% of max iterations, warn user
+            if (iteration >= (maxIterations * 0.8) && iteration < maxIterations) {
+                int remaining = maxIterations - iteration
+                activityLog.appendInfo("Step ${iteration}/${maxIterations} - ${remaining} steps remaining")
+            }
 
             activityLog.appendStatus('Thinking...')
 
@@ -732,15 +742,26 @@ class JexerTUI extends TApplication {
                 request.model = modelId
                 request.messages = messages
                 request.stream = false
-                request.tools = allowedTools.collect { tool ->
-                    [
-                        type: 'function',
-                        function: [
-                            name: tool.name,
-                            description: tool.description,
-                            parameters: tool.parameters
+                
+                if (isLastStep) {
+                    // Last step: disable tools and inject max-steps prompt
+                    request.tools = []
+                    
+                    def maxStepsPrompt = loadMaxStepsPrompt()
+                    messages << new Message('assistant', maxStepsPrompt)
+                    
+                    activityLog.appendWarning('Maximum steps reached - requesting summary')
+                } else {
+                    request.tools = allowedTools.collect { tool ->
+                        [
+                            type: 'function',
+                            function: [
+                                name: tool.name,
+                                description: tool.description,
+                                parameters: tool.parameters
+                            ]
                         ]
-                    ]
+                    }
                 }
 
                 String responseJson = client.sendMessage(request)
@@ -771,6 +792,13 @@ class JexerTUI extends TApplication {
                 }
 
                 if (choice.finishReason == 'tool_calls' || (message.toolCalls != null && !message.toolCalls.isEmpty())) {
+                    if (isLastStep) {
+                        // On last step, if model still requests tools, force text response
+                        activityLog.appendWarning('Tools disabled on final step')
+                        // Continue to next iteration which will request text-only
+                        continue
+                    }
+                    
                     messages << message
 
                     message.toolCalls.each { toolCall ->
@@ -834,10 +862,18 @@ class JexerTUI extends TApplication {
                 break
             }
         }
+    }
 
-        if (iteration >= maxIterations) {
-            activityLog.appendWarning('Reached maximum iterations')
+    // Helper method
+    private String loadMaxStepsPrompt() {
+        def promptFile = new File("prompts/max-steps.txt")
+        if (promptFile.exists()) {
+            return promptFile.text
         }
+        // Fallback prompt
+        return """CRITICAL - MAXIMUM STEPS REACHED
+The maximum number of steps allowed has been reached. Tools are disabled.
+Please provide a summary of work completed and any remaining tasks."""
     }
 
     /**

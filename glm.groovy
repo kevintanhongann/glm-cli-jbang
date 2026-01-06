@@ -27,6 +27,7 @@
 // TUI Dependencies
 //DEPS org.fusesource.jansi:jansi:2.4.1
 //DEPS com.googlecode.lanterna:lanterna:3.1.2
+//DEPS com.williamcallahan:tui4j:0.2.5
 
 // H2 Database for session persistence
 //DEPS com.h2database:h2:2.2.224
@@ -153,6 +154,15 @@
 //SOURCES tui/lanterna/sidebar/TokenSection.groovy
 //SOURCES tui/lanterna/sidebar/LspSection.groovy
 //SOURCES tui/lanterna/sidebar/ModifiedFilesSection.groovy
+
+// TUI sources (TUI4J based)
+//SOURCES tui/Tui4jTUI.groovy
+//SOURCES tui/tui4j/Tui4jTheme.groovy
+//SOURCES tui/tui4j/messages/Messages.groovy
+//SOURCES tui/tui4j/commands/SendChatCommand.groovy
+//SOURCES tui/tui4j/commands/ExecuteToolCommand.groovy
+//SOURCES tui/tui4j/components/ConversationView.groovy
+//SOURCES tui/tui4j/components/SidebarView.groovy
 //
 //// LSP sources
 //SOURCES models/Diagnostic.groovy

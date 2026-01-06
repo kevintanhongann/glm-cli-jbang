@@ -34,6 +34,7 @@ import rag.RAGPipeline
 import com.fasterxml.jackson.databind.ObjectMapper
 import java.nio.file.Paths
 import java.util.UUID
+import java.util.Timer
 import tui.lanterna.widgets.ActivityLogPanel
 import tui.lanterna.widgets.CommandInputPanel
 import tui.lanterna.widgets.SidebarPanel
@@ -625,7 +626,8 @@ class LanternaTUI {
 
         messages << new Message('user', userInput)
 
-        int maxIterations = 10
+        // Get max steps from config (default 25, or unlimited if null)
+        int maxIterations = config.behavior?.maxSteps ?: 25
         int iteration = 0
 
         // Filter tools based on agent type
@@ -637,8 +639,19 @@ class LanternaTUI {
             }
         }
 
+        boolean continueAfterTools = false  // Track if we're continuing after tool execution
+
         while (iteration < maxIterations) {
             iteration++
+
+            // Check if this is the last step
+            boolean isLastStep = (iteration >= maxIterations - 1)
+
+            // At 80% of max iterations, warn user
+            if (iteration >= (maxIterations * 0.8) && iteration < maxIterations) {
+                int remaining = maxIterations - iteration
+                activityLogPanel.appendInfo("Step ${iteration}/${maxIterations} - ${remaining} steps remaining")
+            }
 
             activityLogPanel.appendStatus('Thinking...')
 
@@ -647,94 +660,164 @@ class LanternaTUI {
                 request.model = modelId
                 request.messages = messages
                 request.stream = false
-                request.tools = allowedTools.collect { tool ->
-                    [
-                        type: 'function',
-                        function: [
-                            name: tool.name,
-                            description: tool.description,
-                            parameters: tool.parameters
+
+                if (isLastStep) {
+                    // Last step: disable tools and inject max-steps prompt
+                    request.tools = []
+
+                    def maxStepsPrompt = loadMaxStepsPrompt()
+                    messages << new Message('assistant', maxStepsPrompt)
+
+                    activityLogPanel.appendWarning('Maximum steps reached - requesting summary')
+                } else {
+                    request.tools = allowedTools.collect { tool ->
+                        [
+                            type: 'function',
+                            function: [
+                                name: tool.name,
+                                description: tool.description,
+                                parameters: tool.parameters
+                            ]
                         ]
-                    ]
-                }
-
-                String responseJson = client.sendMessage(request)
-                ChatResponse response = mapper.readValue(responseJson, ChatResponse.class)
-
-                def choice = response.choices[0]
-                def message = choice.message
-
-                // Track token usage
-                if (response.usage) {
-                    int inputTokens = response.usage.promptTokens ?: 0
-                    int outputTokens = response.usage.completionTokens ?: 0
-                    BigDecimal cost = response.usage.cost ?: 0.0000
-
-                    // Update in-memory and database
-                    TokenTracker.instance.recordTokens(sessionId, inputTokens, outputTokens, cost)
-                    SessionStatsManager.instance.updateTokenCount(sessionId, inputTokens, outputTokens, cost)
-
-                    // Refresh sidebar to show updated token count
-                    refreshSidebar()
+                    }
                 }
 
                 activityLogPanel.removeStatus()
 
-                if (message.content) {
-                    activityLogPanel.appendAIResponse(message.content)
-                    activityLogPanel.appendSeparator()
+                // Only start new streaming response if not continuing after tool calls
+                if (!continueAfterTools) {
+                    activityLogPanel.startStreamingResponse()
+                } else {
+                    // Continuing after tool execution - append directly without new prefix
+                    continueAfterTools = false
                 }
 
-                if (choice.finishReason == 'tool_calls' || (message.toolCalls != null && !message.toolCalls.isEmpty())) {
-                    messages << message
+                // Use streaming for real-time display
+                StringBuilder fullResponseBuilder = new StringBuilder()
 
-                    message.toolCalls.each { toolCall ->
-                        String functionName = toolCall.function.name
-                        String arguments = toolCall.function.arguments
-                        String callId = toolCall.id
+                client.streamMessageForTUI(request,
+                    { String chunk ->
+                        activityLogPanel.appendStreamChunk(chunk)
+                        fullResponseBuilder.append(chunk)
+                    },
+                    { String fullResponse ->
+                        activityLogPanel.finishStreamingResponse()
+                        activityLogPanel.appendSeparator()
 
-                        Map<String, Object> args = mapper.readValue(arguments, Map.class)
-                        String toolDisplay = formatToolCall(functionName, args)
+                        // Now check if this response contains tool calls
+                        // We need to make a non-streaming call to get proper tool call structure
+                        if (!isLastStep && request.tools) {
+                            // Make a second non-streaming call to get tool calls
+                            ChatRequest nonStreamRequest = new ChatRequest()
+                            nonStreamRequest.model = modelId
+                            nonStreamRequest.messages = messages
+                            nonStreamRequest.stream = false
+                            nonStreamRequest.tools = request.tools
 
-                        activityLogPanel.appendToolExecution(toolDisplay)
-
-                        def tool = tools.find { it.name == functionName }
-                        String result = ''
-
-                        if (tool) {
                             try {
-                                Object output = tool.execute(args)
-                                result = output.toString()
-                                activityLogPanel.appendToolResult('Success')
+                                String responseJson = client.sendMessage(nonStreamRequest)
+                                ChatResponse response = mapper.readValue(responseJson, ChatResponse.class)
+
+                                def choice = response.choices[0]
+                                def message = choice.message
+
+                                // Track token usage
+                                if (response.usage) {
+                                    int inputTokens = response.usage.promptTokens ?: 0
+                                    int outputTokens = response.usage.completionTokens ?: 0
+                                    BigDecimal cost = response.usage.cost ?: 0.0000
+
+                                    TokenTracker.instance.recordTokens(sessionId, inputTokens, outputTokens, cost)
+                                    SessionStatsManager.instance.updateTokenCount(sessionId, inputTokens, outputTokens, cost)
+                                    refreshSidebar()
+                                }
+
+                                // Use the streaming content for display, but tool calls from structured response
+                                def displayMessage = new Message()
+                                displayMessage.role = 'assistant'
+                                displayMessage.content = fullResponse
+
+                                if (choice.finishReason == 'tool_calls' || (message.toolCalls != null && !message.toolCalls.isEmpty())) {
+                                    // Add streaming content to messages
+                                    messages << displayMessage
+
+                                    // Process tool calls from structured response
+                                    message.toolCalls.each { toolCall ->
+                                        String functionName = toolCall.function.name
+                                        String arguments = toolCall.function.arguments
+                                        String callId = toolCall.id
+
+                                        Map<String, Object> args = mapper.readValue(arguments, Map.class)
+                                        String toolDisplay = formatToolCall(functionName, args)
+
+                                        activityLogPanel.appendToolExecution(toolDisplay)
+
+                                        def tool = tools.find { it.name == functionName }
+                                        String result = ''
+
+                                        if (tool) {
+                                            try {
+                                                Object output = tool.execute(args)
+                                                result = output.toString()
+                                                activityLogPanel.appendToolResult('Success')
+                                            } catch (Exception e) {
+                                                result = "Error: ${e.message}"
+                                                activityLogPanel.appendToolError(e.message)
+                                            }
+                                        } else {
+                                            result = 'Error: Tool not found'
+                                            activityLogPanel.appendToolError('Tool not found')
+                                        }
+
+                                        Message toolMsg = new Message()
+                                        toolMsg.role = 'tool'
+                                        toolMsg.content = result
+                                        toolMsg.toolCallId = callId
+                                        messages << toolMsg
+                                    }
+                                    // Signal that we should continue streaming after tool execution
+                                    continueAfterTools = true
+                                } else {
+                                    // No tool calls, just add the message
+                                    messages << displayMessage
+                                    // Exit the while loop by setting iteration to maxIterations
+                                    iteration = maxIterations
+                                }
                             } catch (Exception e) {
-                                result = "Error: ${e.message}"
-                                activityLogPanel.appendToolError(e.message)
+                                activityLogPanel.appendError("Error processing tool calls: ${e.message}")
+                                // Still add the streaming response
+                                def displayMessage = new Message()
+                                displayMessage.role = 'assistant'
+                                displayMessage.content = fullResponse
+                                messages << displayMessage
                             }
                         } else {
-                            result = 'Error: Tool not found'
-                            activityLogPanel.appendToolError('Tool not found')
+                            // Last step or no tools allowed - just add the streaming response
+                            def displayMessage = new Message()
+                            displayMessage.role = 'assistant'
+                            displayMessage.content = fullResponse
+                            messages << displayMessage
                         }
-
-                        Message toolMsg = new Message()
-                        toolMsg.role = 'tool'
-                        toolMsg.content = result
-                        toolMsg.toolCallId = callId
-                        messages << toolMsg
                     }
-                    activityLogPanel.appendSeparator()
-                } else {
-                    break
-                }
+                )
             } catch (Exception e) {
                 activityLogPanel.removeStatus()
                 activityLogPanel.appendError(e.message)
                 break
             }
         }
+    }
 
-        if (iteration >= maxIterations) {
-            activityLogPanel.appendWarning('Reached maximum iterations')
+    // Helper method
+    private String loadMaxStepsPrompt() {
+        def promptFile = new File('prompts/max-steps.txt')
+        if (promptFile.exists()) {
+            return promptFile.text
         }
+        // Fallback prompt
+        return '''CRITICAL - MAXIMUM STEPS REACHED
+The maximum number of steps allowed has been reached. Tools are disabled.
+Please provide a summary of work completed and any remaining tasks.'''
     }
 
     private String formatToolCall(String name, Map args) {
