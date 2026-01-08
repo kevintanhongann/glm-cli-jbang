@@ -10,6 +10,8 @@ class AgentConfig {
     String description
     List<String> allowedTools = []
     List<String> deniedTools = []
+    List<String> allowedSkills = []
+    List<String> deniedSkills = []
     int maxTurns = 10
     boolean hidden = false
     String model = "glm-4.7"
@@ -35,6 +37,12 @@ class AgentConfig {
         if (toolName in deniedTools) return false
         if (allowedTools.isEmpty()) return true
         return toolName in allowedTools
+    }
+
+    boolean isSkillAllowed(String skillName) {
+        if (skillName in deniedSkills) return false
+        if (!allowedSkills.isEmpty() && !(skillName in allowedSkills)) return false
+        return true
     }
 
     String loadPrompt() {

@@ -369,6 +369,55 @@ class ActivityLogPanel {
     private Timer updateTimer
     private boolean updatePending = false
     private boolean insideThinkTag = false
+    private String partialTagBuffer = ''  // Buffer for partial tags across chunks
+    private Timer animationTimer
+    private int animationIndex = 0
+    private static final String[] ANIMATION_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+    private Closure onStreamingStateChanged = null
+
+    /**
+     * Set callback for streaming state changes.
+     * Callback receives (boolean isStreaming, String indicator)
+     * Use this to update UI elements like status bar or window title.
+     */
+    void setOnStreamingStateChanged(Closure callback) {
+        this.onStreamingStateChanged = callback
+    }
+
+    private void startStreamingAnimation() {
+        if (animationTimer != null) {
+            animationTimer.cancel()
+        }
+        animationIndex = 0
+        animationTimer = new Timer()
+        animationTimer.scheduleAtFixedRate({
+            if (streamingMode && onStreamingStateChanged != null) {
+                animationIndex = (animationIndex + 1) % ANIMATION_FRAMES.length
+                String indicator = ANIMATION_FRAMES[animationIndex]
+                if (textGUI != null && textGUI.getGUIThread() != null) {
+                    textGUI.getGUIThread().invokeLater {
+                        onStreamingStateChanged.call(true, indicator)
+                    }
+                }
+            }
+        } as java.util.TimerTask, 0, 100)
+    }
+
+    private void stopStreamingAnimation() {
+        if (animationTimer != null) {
+            animationTimer.cancel()
+            animationTimer = null
+        }
+        if (onStreamingStateChanged != null) {
+            if (textGUI != null && textGUI.getGUIThread() != null) {
+                textGUI.getGUIThread().invokeLater {
+                    onStreamingStateChanged.call(false, '')
+                }
+            } else {
+                onStreamingStateChanged.call(false, '')
+            }
+        }
+    }
 
     void startStreamingResponse() {
         synchronized (content) {
@@ -377,6 +426,7 @@ class ActivityLogPanel {
             insideThinkTag = false
             content.append('GLM> ')
         }
+        startStreamingAnimation()
         updateDisplay()
     }
 
@@ -394,34 +444,67 @@ class ActivityLogPanel {
 
     /**
      * Filter out <think>...</think> tags from streamed content.
-     * Handles partial tags across chunk boundaries.
+     * Handles partial tags across chunk boundaries and case variations.
      */
     private String filterThinkingTags(String chunk) {
+        // Prepend any buffered content from previous chunk
+        String input = partialTagBuffer + chunk
+        partialTagBuffer = ''
+
         StringBuilder result = new StringBuilder()
         int i = 0
 
-        while (i < chunk.length()) {
+        while (i < input.length()) {
             if (insideThinkTag) {
-                // Look for closing </think>
-                int closeIdx = chunk.indexOf('</think>', i)
+                // Look for closing </think> (case-insensitive)
+                int closeIdx = input.toLowerCase().indexOf('</think>', i)
                 if (closeIdx >= 0) {
                     insideThinkTag = false
                     i = closeIdx + 8 // Skip past </think>
                 } else {
-                    // Still inside think tag, skip rest of chunk
+                    // Check if we might have a partial closing tag at the end
+                    // Buffer the last 8 chars in case it's a partial </think>
+                    if (input.length() - i <= 8) {
+                        partialTagBuffer = input.substring(i)
+                    }
+                    // Still inside think tag, skip rest of input
                     break
                 }
             } else {
-                // Look for opening <think>
-                int openIdx = chunk.indexOf('<think>', i)
+                // Look for opening <think> (case-insensitive)
+                int openIdx = input.toLowerCase().indexOf('<think>', i)
+                // Look for orphan closing </think> (case-insensitive) - sometimes model outputs closing without opening or we missed it
+                int orphanCloseIdx = input.toLowerCase().indexOf('</think>', i)
+
                 if (openIdx >= 0) {
+                    // Check if we have an orphan closing tag BEFORE the opening tag
+                    if (orphanCloseIdx >= 0 && orphanCloseIdx < openIdx) {
+                         // Append content before the orphan closing tag
+                        result.append(input.substring(i, orphanCloseIdx))
+                        i = orphanCloseIdx + 8 // Skip past </think>
+                        continue
+                    }
+
                     // Append content before <think>
-                    result.append(chunk.substring(i, openIdx))
+                    result.append(input.substring(i, openIdx))
                     insideThinkTag = true
                     i = openIdx + 7 // Skip past <think>
+                } else if (orphanCloseIdx >= 0) {
+                     // We found a closing tag but no opening tag - assume it's an orphan and strip it
+                    result.append(input.substring(i, orphanCloseIdx))
+                    i = orphanCloseIdx + 8 // Skip past </think>
                 } else {
-                    // No more think tags, append rest
-                    result.append(chunk.substring(i))
+                    // Check if chunk ends with partial tag like '<', '<t', '<th', etc.
+                    String remaining = input.substring(i)
+                    String potentialPartial = getPotentialPartialTag(remaining, '<think>')
+                    if (potentialPartial) {
+                        // Append everything except the potential partial tag
+                        result.append(remaining.substring(0, remaining.length() - potentialPartial.length()))
+                        partialTagBuffer = potentialPartial
+                    } else {
+                        // No partial tag, append rest
+                        result.append(remaining)
+                    }
                     break
                 }
             }
@@ -430,10 +513,30 @@ class ActivityLogPanel {
         return result.toString()
     }
 
+    /**
+     * Check if the string ends with a partial match of the given tag.
+     * Returns the partial match if found, null otherwise.
+     */
+    private String getPotentialPartialTag(String str, String tag) {
+        String lowerStr = str.toLowerCase()
+        String lowerTag = tag.toLowerCase()
+
+        // Check for partial matches at the end of the string
+        for (int len = 1; len < tag.length(); len++) {
+            String partial = lowerTag.substring(0, len)
+            if (lowerStr.endsWith(partial)) {
+                return str.substring(str.length() - len)
+            }
+        }
+        return null
+    }
+
     void finishStreamingResponse() {
+        stopStreamingAnimation()
         synchronized (content) {
             streamingMode = false
             insideThinkTag = false
+            partialTagBuffer = ''  // Clear any remaining partial tag buffer
             content.append('\n')
         }
         updateDisplay()

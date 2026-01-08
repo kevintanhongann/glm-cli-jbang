@@ -24,6 +24,7 @@ class CommandProvider {
         // Tool commands
         new CommandDefinition('tools', 'List available tools'),
         new CommandDefinition('search', 'Search the web', 'search <query>'),
+        new CommandDefinition('skill', 'List or show skill details', 'skill [list | skill-name]'),
         
         // Context commands
         new CommandDefinition('context', 'Show current context'),

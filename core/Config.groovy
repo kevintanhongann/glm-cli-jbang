@@ -40,6 +40,9 @@ class Config {
     @JsonProperty('instructions')
     List<String> instructions = []
 
+    @JsonProperty('skills')
+    SkillConfig skills = new SkillConfig()
+
     static class ApiConfig {
 
         String key
@@ -138,6 +141,43 @@ class Config {
         @JsonProperty('progress_display')
         Boolean progressDisplay = true
 
+    }
+
+    static class SkillConfig {
+        Boolean enabled = true
+        @JsonProperty('skill_permissions')
+        Map<String, String> skillPermissions = [:]
+
+        boolean isSkillAllowed(String skillName) {
+            if (!enabled) return false
+            def permission = skillPermissions[skillName]
+            if (permission) {
+                return permission != 'deny'
+            }
+            return true
+        }
+    }
+
+    List<String> getSkillPermissionPatterns() {
+        return behavior?.skill_permissions ?: ['*']
+    }
+
+    boolean isSkillAllowed(String skillName) {
+        def patterns = getSkillPermissionPatterns()
+        for (pattern in patterns) {
+            if (matchPattern(pattern, skillName)) {
+                return pattern != 'deny'
+            }
+        }
+        return true
+    }
+
+    private boolean matchPattern(String pattern, String skillName) {
+        if (pattern == '*') return true
+        if (pattern.endsWith('*')) {
+            return skillName.startsWith(pattern[0..-2])
+        }
+        return skillName == pattern
     }
 
     static Config load() {

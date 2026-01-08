@@ -19,6 +19,7 @@ import core.TokenTracker
 import core.LspManager as SidebarLspManager
 import core.LSPManager as LspClientManager
 import core.LSPClient
+import core.SkillRegistry
 import models.ChatRequest
 import models.ChatResponse
 import models.Message
@@ -30,6 +31,7 @@ import tools.CodeSearchTool
 import tools.GrepTool
 import tools.GlobTool
 import tools.Tool
+import tools.SkillTool
 import rag.RAGPipeline
 import com.fasterxml.jackson.databind.ObjectMapper
 import java.nio.file.Paths
@@ -50,6 +52,7 @@ class LanternaTUI {
     private CommandInputPanel commandInputPanel
     private Panel statusBar
     private Label scrollPositionLabel
+    private Label streamingLabel
     private Label agentSwitcherLabel
     private SidebarPanel sidebarPanel
     private boolean sidebarEnabled = true
@@ -65,6 +68,7 @@ class LanternaTUI {
     private ObjectMapper mapper = new ObjectMapper()
     private List<Map> tools = []
     private AgentRegistry agentRegistry
+    private SkillRegistry skillRegistry
     private volatile boolean running = true
     private Thread sidebarRefreshThread
     private tui.lanterna.widgets.Tooltip activeTooltip
@@ -72,6 +76,7 @@ class LanternaTUI {
     LanternaTUI() throws Exception {
         this.currentCwd = System.getProperty('user.dir')
         this.agentRegistry = new AgentRegistry(AgentType.BUILD)
+        this.skillRegistry = new SkillRegistry()
 
         // Set up LSP tracking callback
         LspClientManager.instance.setOnClientCreated { String serverId, LSPClient client, String root ->
@@ -281,6 +286,9 @@ class LanternaTUI {
             }
         }
 
+        // Register skill tool
+        tools << new SkillTool(skillRegistry)
+
         return true
     }
 
@@ -303,6 +311,11 @@ class LanternaTUI {
         // Wire up scroll position updates to status bar
         activityLogPanel.setOnScrollPositionChanged { int currentLine, int totalLines ->
             updateScrollPosition(currentLine, totalLines)
+        }
+
+        // Wire up streaming indicator to status bar
+        activityLogPanel.setOnStreamingStateChanged { boolean isStreaming, String indicator ->
+            updateStreamingIndicator(isStreaming, indicator)
         }
 
         def activityLogComponent = activityLogPanel.getTextBox().withBorder(Borders.singleLine('Activity Log'))
@@ -371,6 +384,12 @@ class LanternaTUI {
         panel.addComponent(scrollPositionLabel)
 
         panel.addComponent(new Label('  |  '))
+
+        // Streaming status label
+        streamingLabel = new Label('')
+        panel.addComponent(streamingLabel)
+
+        panel.addComponent(new Label('  |  '))
         panel.addComponent(new Label('Ctrl+S: Save Log'))
         panel.addComponent(new Label('  |  '))
         panel.addComponent(new Label('Ctrl+C: Exit'))
@@ -399,6 +418,16 @@ class LanternaTUI {
                 scrollPositionLabel.setText("Line ${currentLine}/${totalLines}")
             } else {
                 scrollPositionLabel.setText('')
+            }
+        }
+    }
+
+    private void updateStreamingIndicator(boolean isStreaming, String indicator) {
+        if (streamingLabel != null) {
+            if (isStreaming) {
+                streamingLabel.setText("${indicator} Generating...")
+            } else {
+                streamingLabel.setText('')
             }
         }
     }
@@ -487,6 +516,10 @@ class LanternaTUI {
                 activityLogPanel.clear()
                 activityLogPanel.appendWelcomeMessage(currentModel)
                 appendSystemMessage('Chat history cleared')
+                break
+
+            case 'skill':
+                handleSkillCommand(args)
                 break
 
             case 'exit':
@@ -579,6 +612,12 @@ class LanternaTUI {
         statusBar.addComponent(scrollPositionLabel)
 
         statusBar.addComponent(new Label('  |  '))
+
+        // Re-create streaming label
+        streamingLabel = new Label('')
+        statusBar.addComponent(streamingLabel)
+
+        statusBar.addComponent(new Label('  |  '))
         statusBar.addComponent(new Label('Ctrl+S: Save Log'))
         statusBar.addComponent(new Label('  |  '))
         statusBar.addComponent(new Label('Ctrl+C: Exit'))
@@ -596,6 +635,8 @@ class LanternaTUI {
         appendSystemMessage('=== Available Commands ===')
         appendSystemMessage('/models   - Open model selection dialog')
         appendSystemMessage('/model    - Show current model or switch to specific model')
+        appendSystemMessage('/skill    - List or show skill details')
+        appendSystemMessage('/sidebar  - Toggle sidebar')
         appendSystemMessage('/help     - Show this help message')
         appendSystemMessage('/clear    - Clear chat history')
         appendSystemMessage('/exit     - Exit TUI')
@@ -604,6 +645,33 @@ class LanternaTUI {
         appendSystemMessage('Ctrl+M   - Open model selection dialog')
         appendSystemMessage('Tab      - Switch agent')
         appendSystemMessage('Ctrl+C   - Exit')
+    }
+
+    private void handleSkillCommand(String args) {
+        skillRegistry.discover()
+
+        if (!args || args == 'list' || args == '--list' || args == '-l') {
+            def skills = skillRegistry.getAvailableSkills()
+            if (skills.isEmpty()) {
+                appendSystemMessage('No skills found. Create .glm/skills/<name>/SKILL.md files.')
+            } else {
+                appendSystemMessage('Available Skills:')
+                skills.each { skill ->
+                    appendSystemMessage("  • ${skill.name}: ${skill.description}")
+                }
+                appendSystemMessage("Use /skill <name> to view skill details")
+            }
+        } else {
+            String skillName = args.trim()
+            def skill = skillRegistry.getSkill(skillName)
+            if (!skill) {
+                appendSystemMessage("Skill '${skillName}' not found")
+            } else {
+                appendSystemMessage("=== ${skill.name} ===")
+                appendSystemMessage(skill.content)
+                appendSystemMessage("--- Source: ${skill.sourcePath} ---")
+            }
+        }
     }
 
     private void processInput(String userInput, List<String> mentions = []) {
@@ -836,6 +904,11 @@ Please provide a summary of work completed and any remaining tasks.'''
                 return "Grep \"${truncate(args.pattern?.toString(), 30)}\""
             case 'glob':
                 return "Glob \"${truncate(args.pattern?.toString(), 30)}\""
+            case 'skill':
+                if (args.list_available) {
+                    return "List available skills"
+                }
+                return "Load skill: ${args.name}"
             default:
                 return "${name}(${truncate(args.toString(), 40)})"
         }

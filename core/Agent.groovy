@@ -6,6 +6,7 @@ import models.Message
 import tools.Tool
 import tools.TaskTool
 import tools.BatchTool
+import tools.SkillTool
 import com.fasterxml.jackson.databind.ObjectMapper
 
 import tui.shared.AnsiColors
@@ -52,6 +53,8 @@ class Agent {
     private final ParallelExecutor parallelExecutor
     private final List<ToolExecutionStats> executionStats = []
     private BatchTool batchTool
+    private final SkillRegistry skillRegistry = new SkillRegistry()
+    private SkillTool skillTool
 
     Agent(String apiKey, String model, String sessionId = null) {
         this.client = new GlmClient(apiKey, null, 'jwt')
@@ -65,6 +68,10 @@ class Agent {
         this.parallelExecutor = new ParallelExecutor(config.toolHeuristics?.maxParallelTools ?: 10)
 
         registerTool(new TaskTool(subagentPool))
+
+        // Register the skill tool
+        skillTool = new SkillTool(skillRegistry)
+        registerTool(skillTool)
 
         // BatchTool needs access to all registered tools, so we register it after other tools
         // It will be properly initialized when tools are fully registered
@@ -89,6 +96,14 @@ class Agent {
         parallelExecutor?.shutdown()
         batchTool?.shutdown()
         sessionManager?.shutdown()
+    }
+
+    void loadSkill(String skillName) {
+        skillRegistry.discover()
+        def content = skillTool.getLoadedSkillContent(skillName)
+        if (content) {
+            history.add(new Message('system', "--- Loaded Skill: ${skillName} ---\n${content}"))
+        }
     }
 
     /**
