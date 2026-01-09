@@ -11,14 +11,14 @@ class LanternaTheme {
             try {
                 // Set default window background
                 def theme = SimpleTheme.makeTheme(
-                    true,                          // ANSI colors
-                    getTextColor(),                // foreground
-                    getBackgroundColor(),          // background
-                    getAccentColor(),              // selected foreground
-                    getBackgroundElementColor(),   // selected background
-                    getAccentColor(),              // edit foreground
-                    getBackgroundColor(),          // edit background
-                    getAccentColor()               // gui background
+                    true,                          // activeIsBold
+                    getTextColor(),                // baseForeground
+                    getBackgroundColor(),          // baseBackground
+                    getAccentColor(),              // editableForeground
+                    getBackgroundColor(),          // editableBackground
+                    getAccentColor(),              // selectedForeground
+                    getBackgroundElementColor(),   // selectedBackground
+                    getBackgroundColor()           // guiBackground
                 )
                 gui.setTheme(theme)
             } catch (Exception e) {

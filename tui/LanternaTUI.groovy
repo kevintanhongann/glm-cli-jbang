@@ -553,7 +553,7 @@ class LanternaTUI {
     }
 
     private void appendSystemMessage(String message) {
-        activityLogPanel.getTextBox().getRenderer().addLine("ℹ️  ${message}")
+        activityLogPanel.getTextBox().getRenderer().addLine("ℹ️  ${message}".toString())
     }
 
     void showModelSelectionDialog() {
