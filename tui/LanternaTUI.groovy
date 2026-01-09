@@ -479,6 +479,11 @@ class LanternaTUI {
         updateFooter()
     }
 
+    void exit() {
+        core.SessionManager.instance?.shutdown()
+        mainWindow.close()
+    }
+
     void processUserInput(String input, List<String> mentions = []) {
         // Handle slash commands
         if (input.startsWith('/')) {
@@ -619,7 +624,7 @@ class LanternaTUI {
         appendSystemMessage('Keyboard shortcuts:')
         appendSystemMessage('Ctrl+M   - Open model selection dialog')
         appendSystemMessage('Tab      - Switch agent')
-        appendSystemMessage('Ctrl+C   - Exit')
+        appendSystemMessage('Ctrl+C   - Clear input (exit if empty)')
     }
 
     private void handleSkillCommand(String args) {

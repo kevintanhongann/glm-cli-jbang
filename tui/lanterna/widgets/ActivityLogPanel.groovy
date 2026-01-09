@@ -264,7 +264,7 @@ class ActivityLogPanel {
     void appendWelcomeMessage(String model) {
         synchronized (content) {
             content.append("╔═════════════════════════════════════════════════════════════════╗\n")
-            content.append("║                    GLM CLI TUI                                    ║\n")
+            content.append("║                    GLM CLI TUI                                  ║\n")
             content.append("╚═════════════════════════════════════════════════════════════════╝\n")
             content.append("\n")
             content.append("Model: ${model}\n")

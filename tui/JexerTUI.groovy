@@ -95,11 +95,16 @@ class JexerTUI extends TApplication {
      */
     @Override
     protected boolean onKeypress(TKeypressEvent keypress) {
-        // Ctrl+C: Exit
+        // Ctrl+C: Clear input or exit
         if (keypress.getKey().equals(kbCtrlC)) {
-            core.SessionManager.instance?.shutdown()
-            running = false
-            exit()
+            String currentInput = commandInput?.getText() ?: ''
+            if (!currentInput.trim().isEmpty()) {
+                commandInput?.clear()
+            } else {
+                core.SessionManager.instance?.shutdown()
+                running = false
+                exit()
+            }
             return true
         }
 
@@ -622,7 +627,7 @@ class JexerTUI extends TApplication {
         activityLog.appendSystemMessage('Tab        - Switch agent forward')
         activityLog.appendSystemMessage('Shift+Tab  - Switch agent backward')
         activityLog.appendSystemMessage('Ctrl+S     - Export activity log')
-        activityLog.appendSystemMessage('Ctrl+C     - Exit')
+        activityLog.appendSystemMessage('Ctrl+C     - Clear input (exit if empty)')
     }
 
     /**

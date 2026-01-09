@@ -128,7 +128,7 @@ class KeybindManager {
             case 'autocomplete':
                 return 'Show autocomplete'
             case 'cancel':
-                return 'Cancel / Clear input'
+                return 'Cancel / Clear input (Ctrl+C also clears, exits when empty)'
             default:
                 return action
         }

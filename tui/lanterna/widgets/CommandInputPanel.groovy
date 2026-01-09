@@ -204,6 +204,19 @@ class CommandInputPanel {
                 return false
             }
 
+            // Ctrl+C - clear input or exit
+            if (!autocompletePopup.isVisible() &&
+                key.isCtrlDown() && keyType == KeyType.Character && key.getCharacter() == 'c') {
+                String currentText = inputBox.getText()
+                if (!currentText.trim().isEmpty()) {
+                    inputBox.setText('')
+                    autocompletePopup.hide()
+                } else {
+                    tui.exit()
+                }
+                return false
+            }
+
             return true
         })
     }
