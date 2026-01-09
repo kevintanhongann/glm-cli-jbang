@@ -13,12 +13,13 @@ import org.junit.platform.engine.discovery.DiscoverySelectors
 
 import static org.junit.platform.engine.discovery.ClassNameFilter.includeClassNamePatterns
 
-// Base directory for test classes
-String testDir = new File(getClass().protectionDomain.codeSource.location.toURI()).parent
-
-// Build request
+// Build request to include all test packages
 LauncherDiscoveryRequest request = LauncherDiscoveryRequestBuilder.request()
-    .selectors(DiscoverySelectors.selectPackage("tests"))
+    .selectors(
+        DiscoverySelectors.selectPackage("tests.core"),
+        DiscoverySelectors.selectPackage("tests.integration"),
+        DiscoverySelectors.selectPackage("tests.performance")
+    )
     .filters(includeClassNamePatterns(".*Test.*"))
     .build()
 
