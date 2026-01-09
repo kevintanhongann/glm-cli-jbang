@@ -124,7 +124,7 @@ class ActivityLogPanel {
         this.textGUI = textGUI
 
         textBox = new ScrollableTextBox(
-            new TerminalSize(80, 20),
+            new TerminalSize(0, 0),
             '',
             TextBox.Style.MULTI_LINE
         )
@@ -217,6 +217,12 @@ class ActivityLogPanel {
 
     TextBox getTextBox() {
         return textBox
+    }
+
+    void handleResize(int terminalWidth, int terminalHeight) {
+        // Let BorderLayout handle sizing - just invalidate
+        textBox.invalidate()
+        updateDisplay()
     }
 
     void updateDisplay() {

@@ -25,6 +25,58 @@ class Diagnostic {
     
     /** Optional diagnostic code */
     String code
+    
+    /** Optional tags (e.g., Unnecessary, Deprecated) */
+    List<String> tags = []
+    
+    /** Related information for the diagnostic */
+    List<DiagnosticRelatedInformation> relatedInformation = []
+    
+    static Diagnostic fromLsp(Map lsp) {
+        def diag = new Diagnostic()
+        diag.uri = lsp.uri
+        diag.severity = lsp.severity ?: 1
+        diag.message = lsp.message ?: ""
+        diag.source = lsp.source
+        diag.code = lsp.code?.toString()
+        diag.tags = lsp.tags ?: []
+        
+        if (lsp.range) {
+            diag.range = new DiagnosticRange(
+                start: new Position(
+                    line: lsp.range.start?.line ?: 0,
+                    character: lsp.range.start?.character ?: 0
+                ),
+                end: new Position(
+                    line: lsp.range.end?.line ?: 0,
+                    character: lsp.range.end?.character ?: 0
+                )
+            )
+        }
+        
+        if (lsp.relatedInformation) {
+            diag.relatedInformation = lsp.relatedInformation.collect { info ->
+                new DiagnosticRelatedInformation(
+                    location: new Location(
+                        uri: info.location?.uri,
+                        range: new DiagnosticRange(
+                            start: new Position(
+                                line: info.location?.range?.start?.line ?: 0,
+                                character: info.location?.range?.start?.character ?: 0
+                            ),
+                            end: new Position(
+                                line: info.location?.range?.end?.line ?: 0,
+                                character: info.location?.range?.end?.character ?: 0
+                            )
+                        )
+                    ),
+                    message: info.message
+                )
+            }
+        }
+        
+        return diag
+    }
 }
 
 /**
@@ -43,4 +95,22 @@ class DiagnosticRange {
 class Position {
     int line
     int character
+}
+
+/**
+ * Related diagnostic information.
+ */
+@Canonical
+class DiagnosticRelatedInformation {
+    Location location
+    String message
+}
+
+/**
+ * Location in a document.
+ */
+@Canonical
+class Location {
+    String uri
+    DiagnosticRange range
 }

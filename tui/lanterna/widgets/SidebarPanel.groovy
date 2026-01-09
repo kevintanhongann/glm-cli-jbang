@@ -33,11 +33,11 @@ class SidebarPanel extends Panel {
         return width
     }
 
-    SidebarPanel(MultiWindowTextGUI textGUI, String sessionId, int terminalWidth) {
+    SidebarPanel(MultiWindowTextGUI textGUI, String sessionId, int width) {
         this.textGUI = textGUI
         this.sessionId = sessionId
-        this.terminalWidth = terminalWidth
-        this.width = calculateSidebarWidth(terminalWidth)
+        this.width = width
+        this.terminalWidth = 0 // Not used when width is passed directly
 
         setLayoutManager(new LinearLayout(Direction.VERTICAL))
 
@@ -48,16 +48,6 @@ class SidebarPanel extends Panel {
         modifiedFilesSection = new ModifiedFilesSection(sessionId)
 
         buildUI()
-    }
-
-    private static int calculateSidebarWidth(int terminalWidth) {
-        if (terminalWidth >= 100) {
-            return 42
-        } else if (terminalWidth >= 80) {
-            return 32
-        } else {
-            return 0
-        }
     }
 
     private void buildUI() {

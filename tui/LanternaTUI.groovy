@@ -34,13 +34,14 @@ import tools.Tool
 import tools.SkillTool
 import rag.RAGPipeline
 import com.fasterxml.jackson.databind.ObjectMapper
-import java.nio.file.Paths
 import java.util.UUID
 import java.util.Timer
 import tui.lanterna.widgets.ActivityLogPanel
 import tui.lanterna.widgets.CommandInputPanel
 import tui.lanterna.widgets.SidebarPanel
 import tui.lanterna.widgets.ModelSelectionDialog
+import tui.lanterna.widgets.HeaderPanel
+import tui.lanterna.widgets.FooterPanel
 import tui.shared.CommandProvider
 
 class LanternaTUI {
@@ -50,10 +51,8 @@ class LanternaTUI {
     private BasicWindow mainWindow
     private ActivityLogPanel activityLogPanel
     private CommandInputPanel commandInputPanel
-    private Panel statusBar
-    private Label scrollPositionLabel
-    private Label streamingLabel
-    private Label agentSwitcherLabel
+    private HeaderPanel headerPanel
+    private FooterPanel footerPanel
     private SidebarPanel sidebarPanel
     private boolean sidebarEnabled = true
 
@@ -66,6 +65,10 @@ class LanternaTUI {
     private Config config
     private GlmClient client
     private ObjectMapper mapper = new ObjectMapper()
+
+    // Cancellation support
+    private java.util.concurrent.atomic.AtomicBoolean isGenerating = new java.util.concurrent.atomic.AtomicBoolean(false)
+    private java.util.concurrent.atomic.AtomicBoolean stopRequested = new java.util.concurrent.atomic.AtomicBoolean(false)
     private List<Map> tools = []
     private AgentRegistry agentRegistry
     private SkillRegistry skillRegistry
@@ -109,7 +112,6 @@ class LanternaTUI {
 
     void start(String model = 'opencode/big-pickle', String cwd = null) {
         this.currentModel = model
-        // Create a proper session in the database to satisfy FK constraints for token_stats
         this.sessionId = core.SessionManager.instance.createSession(
             currentCwd ?: System.getProperty('user.dir'),
             'BUILD',
@@ -143,12 +145,24 @@ class LanternaTUI {
             textGUI.setEOFWhenNoWindows(true)
 
             setupMainWindow()
+
+            // Add global key interceptor for ESC
+            mainWindow.addWindowListener(new WindowListenerAdapter() {
+                @Override
+                void onInput(Window basePane, com.googlecode.lanterna.input.KeyStroke keyStroke, java.util.concurrent.atomic.AtomicBoolean hasBeenHandled) {
+                    if (keyStroke.getKeyType() == com.googlecode.lanterna.input.KeyType.Escape) {
+                        if (isGenerating.get()) {
+                            cancelGeneration()
+                            hasBeenHandled.set(true)
+                        }
+                    }
+                }
+            })
+
             setupUI()
 
-            // Initialize LSP tracking by touching a file
+            setupResizeListener()
             initializeLspTracking()
-
-            // Start periodic sidebar refresh for LSP diagnostics
             startSidebarRefreshThread()
 
             textGUI.waitForWindowToClose(mainWindow)
@@ -294,174 +308,175 @@ class LanternaTUI {
 
     private void setupMainWindow() {
         mainWindow = new BasicWindow("GLM CLI - ${currentModel}")
-        mainWindow.setHints(Arrays.asList(Window.Hint.FULL_SCREEN, Window.Hint.NO_DECORATIONS))
+        mainWindow.setHints(Arrays.asList(
+            Window.Hint.FULL_SCREEN,
+            Window.Hint.NO_DECORATIONS,
+            Window.Hint.FIT_TERMINAL_WINDOW
+        ))
     }
 
     private void setupUI() {
         Panel mainContainer = new Panel()
-        mainContainer.setLayoutManager(new LinearLayout(Direction.HORIZONTAL))
+        mainContainer.setLayoutManager(new BorderLayout())
 
-        // Content panel (left/center) - contains activity log, input, status bar
+        // Header at TOP
+        headerPanel = new HeaderPanel("GLM CLI - ${currentModel}")
+        mainContainer.addComponent(headerPanel, BorderLayout.Location.TOP)
+
+        // Footer at BOTTOM
+        footerPanel = new FooterPanel(currentCwd, agentRegistry.getCurrentAgentName(), 'GLM v1.0', currentModel)
+        mainContainer.addComponent(footerPanel, BorderLayout.Location.BOTTOM)
+
+        // Content panel in CENTER
         Panel contentPanel = new Panel()
-        contentPanel.setLayoutManager(new LinearLayout(Direction.VERTICAL))
+        contentPanel.setLayoutManager(new BorderLayout())
+
+        // Left panel (activity log + input) as CENTER of content
+        Panel leftPanel = new Panel()
+        leftPanel.setLayoutManager(new BorderLayout())
 
         activityLogPanel = new ActivityLogPanel(textGUI)
         activityLogPanel.appendWelcomeMessage(currentModel)
-
-        // Wire up scroll position updates to status bar
-        activityLogPanel.setOnScrollPositionChanged { int currentLine, int totalLines ->
-            updateScrollPosition(currentLine, totalLines)
-        }
-
-        // Wire up streaming indicator to status bar
-        activityLogPanel.setOnStreamingStateChanged { boolean isStreaming, String indicator ->
-            updateStreamingIndicator(isStreaming, indicator)
-        }
-
-        def activityLogComponent = activityLogPanel.getTextBox().withBorder(Borders.singleLine('Activity Log'))
-        activityLogComponent.setLayoutData(
-            LinearLayout.createLayoutData(LinearLayout.Alignment.Fill, LinearLayout.GrowPolicy.CanGrow)
-        )
-        contentPanel.addComponent(activityLogComponent)
+        leftPanel.addComponent(activityLogPanel.getTextBox(), BorderLayout.Location.CENTER)
 
         commandInputPanel = new CommandInputPanel(textGUI, this, currentCwd)
-        def commandInputComponent = commandInputPanel.getTextBox().withBorder(Borders.singleLine('Command'))
-        commandInputComponent.setLayoutData(
-            LinearLayout.createLayoutData(LinearLayout.Alignment.Fill, LinearLayout.GrowPolicy.None)
-        )
-        contentPanel.addComponent(commandInputComponent)
+        leftPanel.addComponent(commandInputPanel.getTextBox(), BorderLayout.Location.BOTTOM)
 
-        statusBar = createStatusBar()
-        def statusBarComponent = statusBar.withBorder(Borders.singleLine())
-        statusBarComponent.setLayoutData(
-            LinearLayout.createLayoutData(LinearLayout.Alignment.Fill, LinearLayout.GrowPolicy.None)
-        )
-        contentPanel.addComponent(statusBarComponent)
+        contentPanel.addComponent(leftPanel, BorderLayout.Location.CENTER)
 
-        // Add content panel to container
-        contentPanel.setLayoutData(
-            LinearLayout.createLayoutData(LinearLayout.Alignment.Fill, LinearLayout.GrowPolicy.CanGrow)
-        )
-        mainContainer.addComponent(contentPanel)
+        // Sidebar on RIGHT
+        setupSidebar(contentPanel)
 
-        // Sidebar (right) - responsive based on terminal width
-        try {
-            int terminalWidth = screen.getTerminalSize().getColumns()
-
-            if (sidebarEnabled && terminalWidth >= 80) {
-                sidebarPanel = new SidebarPanel(textGUI, sessionId, terminalWidth)
-
-                // Set fixed size for sidebar panel based on calculated width
-                sidebarPanel.setPreferredSize(new TerminalSize(sidebarPanel.getWidth(), TerminalSize.AUTOSIZE))
-
-                sidebarPanel.setLayoutData(
-                    LinearLayout.createLayoutData(LinearLayout.Alignment.Center, LinearLayout.GrowPolicy.None)
-                )
-                mainContainer.addComponent(sidebarPanel)
-            }
-        } catch (Exception e) {
-        // Ignore terminal size check errors
-        }
-
+        mainContainer.addComponent(contentPanel, BorderLayout.Location.CENTER)
         mainWindow.setComponent(mainContainer)
         textGUI.addWindow(mainWindow)
 
+        LanternaTheme.applyToPanel(headerPanel)
+        LanternaTheme.applyToPanel(footerPanel)
         LanternaTheme.applyDarkTheme(textGUI)
         commandInputPanel.getTextBox().takeFocus()
     }
 
-    private Panel createStatusBar() {
-        Panel panel = new Panel()
-        panel.setLayoutManager(new LinearLayout(Direction.HORIZONTAL))
+    private void setupSidebar(Panel contentPanel) {
+        try {
+            TerminalSize size = screen.getTerminalSize()
+            int terminalWidth = size.getColumns()
 
-        panel.addComponent(new Label("Model: ${currentModel}"))
-        panel.addComponent(new Label('  |  '))
-        panel.addComponent(new Label("Dir: ${Paths.get(currentCwd).fileName}"))
-        panel.addComponent(new Label('  |  '))
+            if (sidebarEnabled && terminalWidth >= 80) {
+                int sidebarWidth = Math.min(30, terminalWidth / 4)
+                sidebarPanel = new SidebarPanel(textGUI, sessionId, sidebarWidth)
+                sidebarPanel.setPreferredSize(new TerminalSize(sidebarWidth, 0))
 
-        // Dynamic scroll position label
-        scrollPositionLabel = new Label('')
-        panel.addComponent(scrollPositionLabel)
-
-        panel.addComponent(new Label('  |  '))
-
-        // Streaming status label
-        streamingLabel = new Label('')
-        panel.addComponent(streamingLabel)
-
-        panel.addComponent(new Label('  |  '))
-        panel.addComponent(new Label('Ctrl+S: Save Log'))
-        panel.addComponent(new Label('  |  '))
-        panel.addComponent(new Label('Ctrl+C: Exit'))
-        panel.addComponent(new Label('  |  '))
-
-        // Agent switcher indicator
-        agentSwitcherLabel = new Label(agentRegistry.getCurrentAgentName())
-        agentSwitcherLabel.setForegroundColor(LanternaTheme.getAgentBuildColor())
-        panel.addComponent(agentSwitcherLabel)
-
-        // Tab hint
-        panel.addComponent(new Label(' (Tab/Shift+Tab to switch)'))
-
-        // Sidebar hint
-        if (sidebarPanel) {
-            panel.addComponent(new Label('  |  '))
-            panel.addComponent(new Label('/sidebar: Toggle'))
+                contentPanel.addComponent(sidebarPanel, BorderLayout.Location.RIGHT)
+            }
+        } catch (Exception e) {
         }
+    }
 
-        return panel
+    private void handleResize(TerminalSize newSize) {
+        try {
+            int terminalWidth = newSize.getColumns()
+            int terminalHeight = newSize.getRows()
+
+            if (sidebarEnabled && terminalWidth >= 80) {
+                if (sidebarPanel == null) {
+                    Panel contentPanel = (Panel) mainWindow.getComponent().getChildren().get(1) // Header is 0, Content is 1
+                    setupSidebar(contentPanel)
+                } else {
+                    int sidebarWidth = Math.min(30, terminalWidth / 4)
+                    sidebarPanel.setPreferredSize(new TerminalSize(sidebarWidth, 0))
+                }
+            } else if (!sidebarEnabled && sidebarPanel != null) {
+                sidebarPanel = null
+            }
+
+            if (activityLogPanel != null) {
+                activityLogPanel.handleResize(terminalWidth, terminalHeight)
+            }
+
+            if (textGUI != null && textGUI.getGUIThread() != null) {
+                textGUI.getGUIThread().invokeLater {
+                    if (mainWindow != null) {
+                        mainWindow.invalidate()
+                    }
+                    textGUI.updateScreen()
+                }
+            }
+        } catch (Exception e) {
+        }
+    }
+
+    private void setupResizeListener() {
+        screen.doResizeIfNecessary()
+        // Poll for resize or use callback if available
+        Thread.start {
+            while (running) {
+                try {
+                    TerminalSize newSize = screen.doResizeIfNecessary()
+                    if (newSize != null) {
+                        handleResize(newSize)
+                    }
+                    Thread.sleep(100)
+                } catch (Exception e) {
+                    break
+                }
+            }
+        }
+    }
+
+    private void updateHeader(int inputTokens, int outputTokens, int percentage, BigDecimal cost, int lspCount) {
+        if (headerPanel != null) {
+            headerPanel.update(inputTokens, outputTokens, percentage, cost, lspCount)
+        }
+    }
+
+    private void updateFooter() {
+        if (footerPanel != null) {
+            footerPanel.update(
+                currentCwd,
+                SidebarLspManager.instance.getConnectedLspCount(sessionId),
+                SidebarLspManager.instance.getErrorLspCount(sessionId),
+                0, 0,
+                agentRegistry.getCurrentAgentName(),
+                agentRegistry.getCurrentAgent() == AgentType.BUILD,
+                currentModel
+            )
+        }
     }
 
     private void updateScrollPosition(int currentLine, int totalLines) {
-        if (scrollPositionLabel != null) {
-            if (currentLine < totalLines - 5) {
-                scrollPositionLabel.setText("Line ${currentLine}/${totalLines}")
-            } else {
-                scrollPositionLabel.setText('')
-            }
-        }
+    // Handled by FooterPanel now
     }
 
     private void updateStreamingIndicator(boolean isStreaming, String indicator) {
-        if (streamingLabel != null) {
-            if (isStreaming) {
-                streamingLabel.setText("${indicator} Generating...")
-            } else {
-                streamingLabel.setText('')
-            }
-        }
+    // Handled by FooterPanel now
     }
 
     void cycleAgent(int direction = 1) {
         agentRegistry.cycleAgent(direction)
-        updateAgentSwitcherIndicator()
         activityLogPanel.appendStatus("Switched to ${agentRegistry.getCurrentAgentName()} agent")
+        updateFooter()
+    }
+
+    void cancelGeneration() {
+        if (isGenerating.get() && !stopRequested.get()) {
+            stopRequested.set(true)
+            activityLogPanel.appendStatus("Stopping generation...")
+        }
     }
 
     void toggleSidebar() {
         if (!sidebarPanel) return
         sidebarPanel.toggle()
         activityLogPanel.appendStatus(sidebarPanel.getExpanded() ? 'Sidebar shown' : 'Sidebar hidden')
+        updateFooter()
     }
 
     void refreshSidebar() {
         if (sidebarPanel) {
             sidebarPanel.refresh()
         }
-    }
-
-    private void updateAgentSwitcherIndicator() {
-        if (agentSwitcherLabel != null) {
-            AgentType currentType = agentRegistry.getCurrentAgent()
-            String agentText = currentType.toString()
-            agentSwitcherLabel.setText(agentText)
-
-            if (currentType == AgentType.BUILD) {
-                agentSwitcherLabel.setForegroundColor(LanternaTheme.getAgentBuildColor())
-            } else {
-                agentSwitcherLabel.setForegroundColor(LanternaTheme.getAgentPlanColor())
-            }
-        }
+        updateFooter()
     }
 
     void processUserInput(String input, List<String> mentions = []) {
@@ -585,50 +600,10 @@ class LanternaTUI {
             // Reinitialize client
             this.client = new GlmClient(newProviderId)
 
-            // Update UI
-            updateWindowAndStatusBar()
-
             activityLogPanel.appendSystemMessage("Switched to model: ${newModel}")
         } catch (Exception e) {
             activityLogPanel.appendSystemMessage("Error switching model: ${e.message}")
         }
-    }
-
-    private void updateWindowAndStatusBar() {
-        // Update window title
-        mainWindow.setTitle("GLM CLI - ${currentModel}")
-
-        // Rebuild status bar by removing and re-adding all components
-        statusBar.removeAllComponents()
-
-        // Re-add all status bar components with updated model
-        statusBar.addComponent(new Label("Model: ${currentModel}"))
-        statusBar.addComponent(new Label('  |  '))
-        statusBar.addComponent(new Label("Dir: ${Paths.get(currentCwd).fileName}"))
-        statusBar.addComponent(new Label('  |  '))
-
-        // Re-create scroll position label
-        scrollPositionLabel = new Label('')
-        statusBar.addComponent(scrollPositionLabel)
-
-        statusBar.addComponent(new Label('  |  '))
-
-        // Re-create streaming label
-        streamingLabel = new Label('')
-        statusBar.addComponent(streamingLabel)
-
-        statusBar.addComponent(new Label('  |  '))
-        statusBar.addComponent(new Label('Ctrl+S: Save Log'))
-        statusBar.addComponent(new Label('  |  '))
-        statusBar.addComponent(new Label('Ctrl+C: Exit'))
-        statusBar.addComponent(new Label('  |  '))
-
-        // Re-create agent switcher indicator
-        agentSwitcherLabel = new Label(agentRegistry.getCurrentAgentName())
-        agentSwitcherLabel.setForegroundColor(LanternaTheme.getAgentBuildColor())
-        statusBar.addComponent(agentSwitcherLabel)
-
-        statusBar.addComponent(new Label(' (Tab/Shift+Tab to switch)'))
     }
 
     private void showHelp() {
@@ -659,7 +634,7 @@ class LanternaTUI {
                 skills.each { skill ->
                     appendSystemMessage("  • ${skill.name}: ${skill.description}")
                 }
-                appendSystemMessage("Use /skill <name> to view skill details")
+                appendSystemMessage('Use /skill <name> to view skill details')
             }
         } else {
             String skillName = args.trim()
@@ -709,8 +684,17 @@ class LanternaTUI {
 
         boolean continueAfterTools = false  // Track if we're continuing after tool execution
 
-        while (iteration < maxIterations) {
-            iteration++
+        isGenerating.set(true)
+        stopRequested.set(false)
+
+        try {
+            while (iteration < maxIterations) {
+                if (stopRequested.get()) {
+                    activityLogPanel.appendWarning("Generation stopped by user")
+                    break
+                }
+
+                iteration++
 
             // Check if this is the last step
             boolean isLastStep = (iteration >= maxIterations - 1)
@@ -774,7 +758,7 @@ class LanternaTUI {
 
                         // Now check if this response contains tool calls
                         // We need to make a non-streaming call to get proper tool call structure
-                        if (!isLastStep && request.tools) {
+                        if (!isLastStep && request.tools && !stopRequested.get()) {
                             // Make a second non-streaming call to get tool calls
                             ChatRequest nonStreamRequest = new ChatRequest()
                             nonStreamRequest.model = modelId
@@ -797,6 +781,13 @@ class LanternaTUI {
 
                                     TokenTracker.instance.recordTokens(sessionId, inputTokens, outputTokens, cost)
                                     SessionStatsManager.instance.updateTokenCount(sessionId, inputTokens, outputTokens, cost)
+
+                                    int totalTokens = inputTokens + outputTokens
+                                    int percentage = Math.min((totalTokens / 128000) * 100 as int, 100)
+                                    int lspCount = SidebarLspManager.instance.getConnectedLspCount(sessionId)
+
+                                    updateHeader(inputTokens, outputTokens, percentage, cost, lspCount)
+                                    updateFooter()
                                     refreshSidebar()
                                 }
 
@@ -811,6 +802,8 @@ class LanternaTUI {
 
                                     // Process tool calls from structured response
                                     message.toolCalls.each { toolCall ->
+                                        if (stopRequested.get()) return // Stop tool processing if requested during loop
+
                                         String functionName = toolCall.function.name
                                         String arguments = toolCall.function.arguments
                                         String callId = toolCall.id
@@ -843,36 +836,56 @@ class LanternaTUI {
                                         toolMsg.toolCallId = callId
                                         messages << toolMsg
                                     }
-                                    // Signal that we should continue streaming after tool execution
+
+                                    // Continue loop to process tool results
                                     continueAfterTools = true
+                                // Continue while loop
                                 } else {
-                                    // No tool calls, just add the message
+                                    // No tool calls, we are done
                                     messages << displayMessage
                                     // Exit the while loop by setting iteration to maxIterations
                                     iteration = maxIterations
                                 }
                             } catch (Exception e) {
                                 activityLogPanel.appendError("Error processing tool calls: ${e.message}")
-                                // Still add the streaming response
-                                def displayMessage = new Message()
-                                displayMessage.role = 'assistant'
-                                displayMessage.content = fullResponse
-                                messages << displayMessage
                             }
-                        } else {
-                            // Last step or no tools allowed - just add the streaming response
-                            def displayMessage = new Message()
-                            displayMessage.role = 'assistant'
-                            displayMessage.content = fullResponse
-                            messages << displayMessage
-                        }
-                    }
-                )
+                         } else {
+                              // No tools or last step, we are done
+                              def displayMessage = new Message()
+                              displayMessage.role = 'assistant'
+                              displayMessage.content = fullResponse
+                              messages << displayMessage
+                              // Exit the while loop by setting iteration to maxIterations
+                              iteration = maxIterations
+                         }
+                    },
+                    { stopRequested.get() }
+                ) // End of streamMessageForTUI
+
+                // If stopped, break out of the while loop
+                if (stopRequested.get()) {
+                    break
+                }
+
+                // If we are not continuing after tools (and not stopped), we are done with this turn
+                if (!continueAfterTools) {
+                    break
+                }
+
             } catch (Exception e) {
+                activityLogPanel.appendError("Error in chat request: ${e.message}")
+            } finally {
                 activityLogPanel.removeStatus()
-                activityLogPanel.appendError(e.message)
-                break
             }
+
+            }
+
+        } catch (Exception e) {
+            activityLogPanel.appendError("Error in conversation loop: ${e.message}")
+            e.printStackTrace()
+        } finally {
+            isGenerating.set(false)
+            activityLogPanel.removeStatus()
         }
     }
 
@@ -906,7 +919,7 @@ Please provide a summary of work completed and any remaining tasks.'''
                 return "Glob \"${truncate(args.pattern?.toString(), 30)}\""
             case 'skill':
                 if (args.list_available) {
-                    return "List available skills"
+                    return 'List available skills'
                 }
                 return "Load skill: ${args.name}"
             default:

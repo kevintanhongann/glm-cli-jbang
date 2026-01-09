@@ -15,9 +15,12 @@ import static org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder.r
 import tests.tools.ReadFileToolTest
 import tests.tools.WriteFileToolTest
 import tests.tools.GrepToolTest
+import tests.tools.SkillToolTest
 import tests.core.AgentTest
 import tests.core.ConfigTest
 import tests.core.InstructionsTest
+import tests.core.SkillRegistryTest
+import tests.models.SkillTest
 
 println "=".repeat(70)
 println "GLM-CLI Test Suite"
@@ -31,7 +34,10 @@ def testClasses = [
     GrepToolTest,
     AgentTest,
     ConfigTest,
-    InstructionsTest
+    InstructionsTest,
+    SkillTest,
+    SkillRegistryTest,
+    SkillToolTest
 ]
 
 def totalTests = 0

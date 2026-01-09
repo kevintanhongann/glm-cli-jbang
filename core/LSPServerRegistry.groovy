@@ -25,38 +25,68 @@ class LSPServerRegistry {
         'typescript': new LSPServerConfig(
             id: 'typescript',
             command: ['npx', 'typescript-language-server', '--stdio'],
-            extensions: ['.ts', '.tsx', '.js', '.jsx'],
-            rootDetector: { dir -> RootDetector.findNearestFile(dir, 'package.json', 'tsconfig.json') }
+            extensions: ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'],
+            rootDetector: { dir -> RootDetector.findNearestFile(dir, 'package.json', 'tsconfig.json', 'jsconfig.json') }
         ),
         'java': new LSPServerConfig(
             id: 'java',
             command: ['jdtls'],
             extensions: ['.java'],
-            rootDetector: { dir -> RootDetector.findNearestFile(dir, 'pom.xml', 'build.gradle', 'settings.gradle') }
+            rootDetector: { dir -> RootDetector.findNearestFile(dir, 'pom.xml', 'build.gradle', 'settings.gradle', 'build.gradle.kts', 'settings.gradle.kts') }
         ),
         'groovy': new LSPServerConfig(
             id: 'groovy',
             command: ['groovy-language-server'],
-            extensions: ['.groovy'],
-            rootDetector: { dir -> RootDetector.findNearestFile(dir, 'build.gradle', 'settings.gradle') }
+            extensions: ['.groovy', '.gvy', '.gy'],
+            rootDetector: { dir -> RootDetector.findNearestFile(dir, 'build.gradle', 'settings.gradle', 'gradle.properties', '.groovylintrc.json') }
         ),
         'python': new LSPServerConfig(
             id: 'python',
             command: ['npx', 'pyright-langserver', '--stdio'],
-            extensions: ['.py'],
-            rootDetector: { dir -> RootDetector.findNearestFile(dir, 'pyproject.toml', 'setup.py', 'requirements.txt') }
+            extensions: ['.py', '.pyw'],
+            rootDetector: { dir -> RootDetector.findNearestFile(dir, 'pyproject.toml', 'setup.py', 'requirements.txt', 'setup.cfg', 'pyrightconfig.json') }
         ),
         'go': new LSPServerConfig(
             id: 'go',
             command: ['gopls'],
             extensions: ['.go'],
-            rootDetector: { dir -> RootDetector.findNearestFile(dir, 'go.mod') }
+            rootDetector: { dir -> RootDetector.findNearestFile(dir, 'go.mod', 'go.sum', 'go.work') }
         ),
         'rust': new LSPServerConfig(
             id: 'rust',
             command: ['rust-analyzer'],
             extensions: ['.rs'],
-            rootDetector: { dir -> RootDetector.findNearestFile(dir, 'Cargo.toml') }
+            rootDetector: { dir -> RootDetector.findNearestFile(dir, 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml') }
+        ),
+        'json': new LSPServerConfig(
+            id: 'json',
+            command: ['npx', '-y', 'vscode-json-languageserver', '--stdio'],
+            extensions: ['.json', '.jsonc', '.jsonl'],
+            rootDetector: { dir -> RootDetector.findNearestFile(dir, 'package.json', 'tsconfig.json', '.eslintrc.json') }
+        ),
+        'yaml': new LSPServerConfig(
+            id: 'yaml',
+            command: ['npx', '-y', 'yaml-language-server', '--stdio'],
+            extensions: ['.yaml', '.yml'],
+            rootDetector: { dir -> RootDetector.findNearestFile(dir, '.yaml-lint', '.yamllint') }
+        ),
+        'html': new LSPServerConfig(
+            id: 'html',
+            command: ['npx', '-y', 'vscode-html-languageserver', '--stdio'],
+            extensions: ['.html', '.htm'],
+            rootDetector: { dir -> null }
+        ),
+        'css': new LSPServerConfig(
+            id: 'css',
+            command: ['npx', '-y', 'vscode-css-languageserver', '--stdio'],
+            extensions: ['.css', '.scss', '.sass', '.less', '.styl'],
+            rootDetector: { dir -> null }
+        ),
+        'markdown': new LSPServerConfig(
+            id: 'markdown',
+            command: ['npx', '-y', 'markdown-language-server', '--stdio'],
+            extensions: ['.md', '.markdown'],
+            rootDetector: { dir -> null }
         )
     ]
     

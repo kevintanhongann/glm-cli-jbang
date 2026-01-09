@@ -295,4 +295,147 @@ class LSPClient {
     boolean isAlive() {
         return rpc.alive
     }
+    
+    // ============ Code Intelligence Methods ============
+    
+    /**
+     * Go to definition of symbol at position.
+     */
+    List<Map> goToDefinition(String filePath, int line, int character) {
+        def uri = "file://${filePath}"
+        def params = [
+            textDocument: [uri: uri],
+            position: [line: line, character: character]
+        ]
+        
+        try {
+            def result = rpc.sendRequest("textDocument/definition", params, 5000)
+            return flattenLocations(result)
+        } catch (Exception e) {
+            System.err.println("goToDefinition failed: ${e.message}")
+            return []
+        }
+    }
+    
+    /**
+     * Find all references to symbol at position.
+     */
+    List<Map> findReferences(String filePath, int line, int character) {
+        def uri = "file://${filePath}"
+        def params = [
+            textDocument: [uri: uri],
+            position: [line: line, character: character],
+            context: [includeDeclaration: true]
+        ]
+        
+        try {
+            def result = rpc.sendRequest("textDocument/references", params, 5000)
+            return flattenLocations(result)
+        } catch (Exception e) {
+            System.err.println("findReferences failed: ${e.message}")
+            return []
+        }
+    }
+    /**
+     * Get hover information at position.
+     */
+    Map hover(String filePath, int line, int character) {
+        def uri = "file://${filePath}"
+        def params = [
+            textDocument: [uri: uri],
+            position: [line: line, character: character]
+        ]
+        
+        try {
+            return rpc.sendRequest("textDocument/hover", params, 5000) as Map
+        } catch (Exception e) {
+            System.err.println("hover failed: ${e.message}")
+            return null
+        }
+    }
+    
+    /**
+     * Get document symbols.
+     */
+    List<Map> documentSymbol(String filePath) {
+        def uri = "file://${filePath}"
+        def params = [textDocument: [uri: uri]]
+        
+        try {
+            def result = rpc.sendRequest("textDocument/documentSymbol", params, 5000)
+            if (result instanceof List) {
+                return result
+            }
+            return []
+        } catch (Exception e) {
+            System.err.println("documentSymbol failed: ${e.message}")
+            return []
+        }
+    }
+    
+    /**
+     * Search workspace symbols.
+     */
+    List<Map> workspaceSymbol(String query) {
+        def params = [query: query]
+        
+        try {
+            def result = rpc.sendRequest("workspace/symbol", params, 5000)
+            if (result instanceof List) {
+                return result
+            }
+            return []
+        } catch (Exception e) {
+            System.err.println("workspaceSymbol failed: ${e.message}")
+            return []
+        }
+    }
+    
+    /**
+     * Get completions at position.
+     */
+    List<Map> completion(String filePath, int line, int character) {
+        def uri = "file://${filePath}"
+        def params = [
+            textDocument: [uri: uri],
+            position: [line: line, character: character]
+        ]
+        
+        try {
+            def result = rpc.sendRequest("textDocument/completion", params, 3000)
+            if (result instanceof List) {
+                return result
+            }
+            return []
+        } catch (Exception e) {
+            System.err.println("completion failed: ${e.message}")
+            return []
+        }
+    }
+    
+    /**
+     * Flatten LSP location responses to a consistent format.
+     */
+    private List<Map> flattenLocations(result) {
+        if (result == null) {
+            return []
+        }
+        if (result instanceof List) {
+            return result.collect { locationFromLsp(it) }
+        }
+        return [locationFromLsp(result)]
+    }
+    
+    /**
+     * Convert LSP location to consistent format.
+     */
+    private Map locationFromLsp(lspLocation) {
+        return [
+            uri: lspLocation.uri,
+            range: [
+                start: [line: lspLocation.range?.start?.line, character: lspLocation.range?.start?.character],
+                end: [line: lspLocation.range?.end?.line, character: lspLocation.range?.end?.character]
+            ]
+        ]
+    }
 }
