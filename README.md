@@ -1,6 +1,6 @@
 # GLM-CLI (JBang Edition)
 
-![Version](https://img.shields.io/badge/version-0.1-blue?style=flat-square)
+![Version](https://img.shields.io/badge/version-1.0.0-blue?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
 ![Groovy](https://img.shields.io/badge/Groovy-4.x-orange?style=flat-square)
 ![JBang](https://img.shields.io/badge/JBang-compatible-red?style=flat-square)
@@ -9,21 +9,23 @@ A native-performance AI coding agent CLI for Linux, macOS, and Windows, powered 
 
 ![Demo](https://img.shields.io/badge/demo-available-lightgrey?style=flat-square)
 
-<img width="1910" height="941" alt="image" src="https://github.com/user-attachments/assets/af623ad0-f541-40ce-b040-c714c4ba7b9a" />
-
 ⚠️ Under Active Development - glm-cli-jbang is actively developed. If you ⭐ star and 👀 watch this repository, it would mean a lot to me.
 
 ## Features
 
 | Feature | Description |
 |---------|-------------|
-| **Chat** | Interactive conversation with multiple AI providers and models |
+| **TUI** | Full-screen terminal interface with sidebar showing LSP diagnostics, token usage, session info, and modified files |
 | **Agent** | Autonomous task execution with ReAct loop for reading/writing files |
+| **Chat** | Interactive conversation with multiple AI providers and models |
 | **Web Search** | Integrated web search with real-time information retrieval |
-| **Tools** | Built-in tools (`read_file`, `write_file`, `list_files`, `web_search`) with safety checks |
+| **LSP Integration** | Language Server Protocol support for diagnostics, hover, and goto definition |
+| **Session Persistence** | H2 database for storing conversation history across sessions |
+| **Skills** | Reusable agent workflows for common tasks |
+| **RAG Pipeline** | Contextual understanding of your codebase |
 | **Streaming** | Real-time response streaming using Server-Sent Events (SSE) |
 | **Diff Preview** | See file changes before applying with diff visualization |
-| **Configurable** | TOML-based configuration for API keys, defaults, and behavior |
+| **Tools** | 17 built-in tools with safety checks and permission levels |
 | **Multi-Provider** | Support for Zai/Zhipu AI and OpenCode Zen providers |
 | **Model Selection** | Choose from curated models including Big Pickle, GLM-4.7-free, and more |
 
@@ -46,8 +48,11 @@ cd glm-cli-jbang
 # Run with help
 ./glm.groovy --help
 
-# Start chatting
-./glm.groovy chat "Hello!"
+# Start the TUI (default)
+./glm.groovy
+
+# Start with a specific model
+./glm.groovy -m opencode/big-pickle
 ```
 
 ### Install as Global Command
@@ -56,6 +61,7 @@ cd glm-cli-jbang
 jbang app install --name glm glm.groovy
 
 # Now you can use it from anywhere
+glm --help
 glm chat -m opencode/big-pickle "Explain this code"
 glm agent -m zai/glm-4.7 "Refactor User class"
 ```
@@ -64,107 +70,40 @@ glm agent -m zai/glm-4.7 "Refactor User class"
 
 ```bash
 glm --version
-# Output: glm-cli 0.1
+# Output: glm-cli 1.0.0
 ```
 
-## Configuration
+## Commands
 
-The CLI looks for a configuration file at `~/.glm/config.toml`.
+| Command | Description |
+|---------|-------------|
+| `glm` | Launch the TUI (default) |
+| `glm chat [message]` | Interactive chat session or send a single message |
+| `glm agent "task"` | Autonomous task execution with ReAct loop |
+| `glm auth <provider>` | Manage authentication for AI providers |
+| `glm init [path]` | Initialize project with AGENTS.md |
+| `glm session [list\|show\|clear]` | Manage persistent sessions |
+| `glm models [provider]` | List available models |
+| `glm skill <name> [args]` | Execute a registered skill |
 
-### Configuration File Example
+### Chat Command
 
-```toml
-[behavior]
-default_model = "opencode/big-pickle"  # Format: provider/model-id
-safety_mode = "ask" # 'ask' or 'always_allow'
-language = "auto"    # 'auto', 'en', 'zh'
-```
-
-### Available Providers
-
-#### OpenCode Zen (Default)
-- **Models**: Big Pickle, GLM-4.7-free, GLM-4.6, Kimi K2, Qwen3 Coder, Grok Code, MiniMax M2.1
-- **Auth**: `glm auth login opencode`
-- **Get API Key**: https://opencode.ai/auth
-- **Free models**: Big Pickle, GLM-4.7-free, Grok Code, MiniMax M2.1
-
-#### Zai/Zhipu AI
-- **Models**: GLM-4-flash, GLM-4.7
-- **Auth**: `glm auth login zai`
-- **Get API Key**: https://open.bigmodel.cn/usercenter/apikeys
-
-### List Available Models
+Start an interactive session or send a single message:
 
 ```bash
-# List all models
-glm models
-
-# List models for a specific provider
-glm models opencode
-glm models zai
-
-# Show detailed information
-glm models --verbose
-
-# Refresh model catalog
-glm models --refresh
-```
-
-### Configuration Priority
-
-1. Command-line flags (highest priority)
-2. Provider credentials from `glm auth login`
-3. `~/.glm/config.toml`
-4. Default values (lowest priority)
-
-## Usage
-
-### Authentication
-
-Login to a provider:
-
-```bash
-# Login to OpenCode Zen (recommended, includes free models)
-glm auth login opencode
-
-# Login to Zai/Zhipu AI
-glm auth login zai
-
-# List configured credentials
-glm auth list
-
-# Logout from a provider
-glm auth logout opencode
-```
-
-### Chat
-
-Start an interactive session:
-
-```bash
+# Interactive chat session
 glm chat
-```
 
-Or send a single message:
-
-```bash
+# Send a single message
 glm chat "Explain this project structure"
-```
 
-With a specific model:
-
-```bash
-# Use OpenCode Zen's Big Pickle (free, stealth model)
+# With a specific model
 glm chat -m opencode/big-pickle "Write a sorting algorithm"
-
-# Use Zai's GLM-4.7
 glm chat -m zai/glm-4.7 "Refactor this code"
-
-# Use OpenCode Zen's GLM-4.7-free (free model)
 glm chat -m opencode/glm-4.7-free "Help me debug"
 ```
 
-### Agent
+### Agent Command
 
 Ask the agent to perform a task involving file operations:
 
@@ -179,7 +118,7 @@ The agent will:
 4. **Execute** the write operation
 5. **Verify** and report results
 
-### Example Agent Workflows
+### Agent Workflows
 
 ```bash
 # Refactor code
@@ -198,6 +137,147 @@ glm agent "Add JavaDoc comments to all public methods in the API client"
 glm agent "Search for recent news about Java 21 features and summarize"
 ```
 
+### Authentication Command
+
+Login to a provider:
+
+```bash
+# Login to OpenCode Zen (recommended, includes free models)
+glm auth login opencode
+
+# Login to Zai/Zhipu AI
+glm auth login zai
+
+# List configured credentials
+glm auth list
+
+# Logout from a provider
+glm auth logout opencode
+```
+
+### Init Command
+
+Initialize a project with AGENTS.md:
+
+```bash
+# Initialize current directory
+glm init
+
+# Initialize specific directory
+glm init /path/to/project
+```
+
+### Session Command
+
+Manage persistent sessions:
+
+```bash
+# List all sessions
+glm session list
+
+# Show session details
+glm session show <session-id>
+
+# Clear all sessions
+glm session clear
+
+# Start a new session
+glm session start
+```
+
+### Models Command
+
+List available models:
+
+```bash
+# List all models
+glm models
+
+# List models for a specific provider
+glm models opencode
+glm models zai
+
+# Show detailed information
+glm models --verbose
+
+# Refresh model catalog
+glm models --refresh
+```
+
+### Skill Command
+
+Execute registered skills:
+
+```bash
+# List available skills
+glm skill --list
+
+# Execute a skill
+glm skill code-review /path/to/file
+glm skill add-tests --target=User.groovy
+```
+
+## Terminal UI (TUI)
+
+Launch a full-screen terminal interface:
+
+```bash
+# Launch default TUI (Lanterna)
+glm
+
+# Launch with specific TUI
+glm --tui lanterna    # Default, full-featured
+glm --tui jexer       # Alternative TUI
+glm --tui tui4j       # Another TUI implementation
+
+# Simple console mode (no TUI)
+glm --simple
+```
+
+### TUI Features
+
+- **Sidebar Panels**:
+  - LSP Diagnostics: Show compiler errors and warnings
+  - Token Usage: Track API token consumption
+  - Session Info: Current session statistics
+  - Modified Files: Track changes made by the agent
+
+- **Command Input**: Type messages with autocomplete
+- **Activity Log**: View tool execution history
+- **Model Selection**: Switch models on the fly
+
+## Tools
+
+The agent has access to 17 built-in tools:
+
+| Tool | Description | Permission |
+|------|-------------|------------|
+| `read_file` | Read file contents | Always allowed |
+| `write_file` | Write/create files with diff preview | Requires confirmation |
+| `list_files` | List directory contents | Always allowed |
+| `bash` | Execute bash commands | Requires confirmation |
+| `grep` | Search file contents with regex | Always allowed |
+| `glob` | Find files by pattern | Always allowed |
+| `edit` | Make in-place file edits | Requires confirmation |
+| `patch` | Apply patch operations | Requires confirmation |
+| `multi_edit` | Batch file edits | Requires confirmation |
+| `lsp` | Language Server Protocol queries | Always allowed |
+| `web_search` | Search web for current information | Always allowed |
+| `fetch_url` | Fetch content from URLs | Always allowed |
+| `code_search` | AI-powered code search | Always allowed |
+| `batch` | Execute multiple tools | Depends on tools |
+| `task` | Execute subagent tasks | Always allowed |
+| `skill` | Execute registered skills | Always allowed |
+
+### Tool Calling Patterns
+
+The agent can:
+- Call tools sequentially for multi-step tasks
+- Show diff previews before file modifications
+- Handle errors and retry operations
+- Maintain context across tool calls
+- Execute tools in parallel for efficiency
+
 ## Agent System
 
 GLM-CLI uses a **ReAct** (Reasoning + Acting) agent loop:
@@ -207,48 +287,110 @@ GLM-CLI uses a **ReAct** (Reasoning + Acting) agent loop:
 3. **Act**: Either respond with text or call a tool
 4. **Loop**: Append tool results and repeat until completion
 
-### Available Tools
+## Configuration
 
-| Tool | Description | Permission Level |
-|------|-------------|------------------|
-| `read_file` | Read file contents | Always allowed |
-| `write_file` | Write/create files with diff preview | Requires confirmation |
-| `list_files` | List directory contents | Always allowed |
-| `web_search` | Search web for current information | Always allowed |
+The CLI looks for a configuration file at `~/.glm/config.toml`.
 
-### Tool Calling Patterns
+### Configuration File Example
 
-The agent can:
-- Call tools sequentially for multi-step tasks
-- Show diff previews before file modifications
-- Handle errors and retry operations
-- Maintain context across tool calls
+```toml
+[behavior]
+default_model = "opencode/big-pickle"  # Format: provider/model-id
+safety_mode = "ask" # 'ask' or 'always_allow'
+language = "auto"    # 'auto', 'en', 'zh'
 
-## Development
+[tui]
+type = "lanterna"    # 'lanterna', 'jexer', 'tui4j'
+theme = "dark"       # 'dark', 'light', 'high-contrast'
+```
 
-### Project Structure
+### Available Providers
+
+#### OpenCode Zen (Default)
+- **Models**: Big Pickle, GLM-4.7-free, GLM-4.6, Kimi K2, Qwen3 Coder, Grok Code, MiniMax M2.1
+- **Auth**: `glm auth login opencode`
+- **Get API Key**: https://opencode.ai/auth
+- **Free models**: Big Pickle, GLM-4.7-free, Grok Code, MiniMax M2.1
+
+#### Zai/Zhipu AI
+- **Models**: GLM-4-flash, GLM-4.7
+- **Auth**: `glm auth login zai`
+- **Get API Key**: https://open.bigmodel.cn/usercenter/apikeys
+
+### Configuration Priority
+
+1. Command-line flags (highest priority)
+2. Provider credentials from `glm auth login`
+3. `~/.glm/config.toml`
+4. Default values (lowest priority)
+
+## Project Structure
 
 ```
 glm-cli-jbang/
-├── glm.groovy              # Main entry point (shebang, dependencies)
-├── commands/               # CLI command implementations
-│   ├── GlmCli.groovy       # Root command with subcommands
-│   ├── ChatCommand.groovy  # Interactive chat command
-│   └── AgentCommand.groovy # Autonomous agent command
-├── core/                   # Core business logic
-│   ├── Agent.groovy        # ReAct agent loop
-│   ├── GlmClient.groovy    # HTTP/SSE client
-│   └── Config.groovy       # Configuration handler
-├── tools/                  # Tool implementations
-│   ├── Tool.groovy         # Tool interface
-│   ├── ReadFileTool.groovy
-│   ├── WriteFileTool.groovy
-│   └── ListFilesTool.groovy
-└── models/                 # API data models
-    ├── ChatRequest.groovy
-    ├── ChatResponse.groovy
-    └── Message.groovy
+├── glm.groovy                    # Main entry point (shebang, dependencies)
+├── commands/                     # CLI command implementations
+│   ├── GlmCli.groovy             # Root command with subcommands
+│   ├── ChatCommand.groovy        # Interactive chat command
+│   ├── AgentCommand.groovy       # Autonomous agent command
+│   ├── AuthCommand.groovy        # Authentication management
+│   ├── InitCommand.groovy        # Project initialization
+│   ├── SessionCommand.groovy     # Session management
+│   ├── ModelsCommand.groovy      # Model listing
+│   └── SkillCommand.groovy       # Skills execution
+├── core/                         # Core business logic
+│   ├── Agent.groovy              # ReAct agent loop
+│   ├── SessionManager.groovy     # Session persistence (H2)
+│   ├── GlmClient.groovy          # HTTP/SSE client
+│   ├── Config.groovy             # Configuration handler
+│   ├── LSPManager.groovy         # Language Server Protocol
+│   ├── TokenTracker.groovy       # Token usage tracking
+│   ├── Subagent.groovy           # Subagent execution
+│   ├── ModelCatalog.groovy       # Model catalog management
+│   └── WebSearchClient.groovy    # Web search client
+├── tools/                        # Tool implementations (17 tools)
+│   ├── Tool.groovy               # Tool interface
+│   ├── ReadFileTool.groovy       # Read file contents
+│   ├── WriteFileTool.groovy      # Write files
+│   ├── ListFilesTool.groovy      # List directory contents
+│   ├── BashTool.groovy           # Execute bash commands
+│   ├── GrepTool.groovy           # Search file contents
+│   ├── GlobTool.groovy           # Find files by pattern
+│   ├── EditTool.groovy           # In-place edits
+│   ├── PatchTool.groovy          # Apply patches
+│   ├── MultiEditTool.groovy      # Batch edits
+│   ├── LSPTool.groovy            # LSP integration
+│   ├── WebSearchTool.groovy      # Web search
+│   ├── FetchUrlTool.groovy       # Fetch URLs
+│   ├── CodeSearchTool.groovy     # AI code search
+│   ├── BatchTool.groovy          # Execute multiple tools
+│   ├── TaskTool.groovy           # Subagent tasks
+│   └── SkillTool.groovy          # Execute skills
+├── models/                       # API data models
+│   ├── ChatRequest.groovy
+│   ├── ChatResponse.groovy
+│   ├── Message.groovy
+│   ├── Session.groovy
+│   ├── TokenStats.groovy
+│   ├── Diagnostic.groovy
+│   └── Skill.groovy
+├── tui/                          # Terminal UI implementations
+│   ├── LanternaTUI.groovy        # Default Lanterna-based TUI
+│   ├── JexerTUI.groovy           # Jexer-based TUI
+│   ├── Tui4jTUI.groovy           # TUI4J-based TUI
+│   ├── shared/                   # Shared TUI components
+│   ├── lanterna/                 # Lanterna widgets
+│   ├── jexer/                    # Jexer widgets
+│   └── tui4j/                    # TUI4J components
+├── rag/                          # RAG pipeline for context
+│   ├── CodebaseLoader.groovy
+│   ├── CodeChunker.groovy
+│   ├── EmbeddingService.groovy
+│   └── RAGPipeline.groovy
+└── tests/                        # Test suite
 ```
+
+## Development
 
 ### Development Workflow
 
@@ -256,7 +398,7 @@ glm-cli-jbang/
 # Edit with IDE support
 jbang edit glm.groovy
 
-# Run tests (when available)
+# Run tests
 ./glm.groovy test
 
 # Install locally
@@ -268,13 +410,22 @@ jbang app install --force --name glm glm.groovy
 All dependencies are declared in `glm.groovy`:
 
 ```groovy
+//DEPS dev.langchain4j:langchain4j:1.10.0
+//DEPS dev.langchain4j:langchain4j-zhipu-ai:0.36.2
 //DEPS info.picocli:picocli:4.7.7
 //DEPS info.picocli:picocli-groovy:4.7.7
-//DEPS com.fasterxml.jackson.core:jackson-databind:2.16.0
-//DEPS com.fasterxml.jackson.dataformat:jackson-dataformat-toml:2.16.0
+//DEPS org.apache.groovy:groovy-json:4.0.27
+//DEPS org.apache.groovy:groovy-sql:4.0.27
 //DEPS com.auth0:java-jwt:4.4.0
+//DEPS com.fasterxml.jackson.dataformat:jackson-dataformat-toml:2.15.2
 //DEPS io.github.java-diff-utils:java-diff-utils:4.12
-//DEPS org.slf4j:slf4j-simple:2.0.9
+//DEPS dev.langchain4j:langchain4j-easy-rag:1.0.0-beta2
+//DEPS dev.langchain4j:langchain4j-embeddings-bge-small-en-v15-q:1.0.0-beta2
+//DEPS org.fusesource.jansi:jansi:2.4.1
+//DEPS com.googlecode.lanterna:lanterna:3.1.2
+//DEPS io.gitlab.autumnmeowmeow:jexer:2.0.0
+//DEPS com.williamcallahan:tui4j:0.2.5
+//DEPS com.h2database:h2:2.2.224
 ```
 
 ## FAQ
@@ -282,11 +433,13 @@ All dependencies are declared in `glm.groovy`:
 ### How is this different from other AI coding agents?
 
 **GLM-CLI** offers:
+- 🖥️ **Full Terminal UI** - TUI with sidebar showing diagnostics, tokens, and session info
 - 🌐 **Multi-provider support** - Works with Z.ai GLM models, OpenCode Zen, and more
 - 📦 **Zero-dependency distribution** - JBang manages JDK, no installation beyond the script
 - 🔒 **Diff previews** - See changes before applying with approval workflow
 - ⚡ **Native performance** - JVM optimization for fast startup and execution
 - 🎯 **Groovy simplicity** - Concise, readable codebase that's easy to extend
+- 🔧 **17 Built-in tools** - File operations, bash, grep, glob, LSP, and more
 
 ### Can I use it with other LLM providers?
 
@@ -318,6 +471,7 @@ GLM-CLI implements multiple safety features:
 - **Diff preview** - See changes before applying
 - **No data transmission** - Only files explicitly read are sent to API
 - **Configurable safety modes** - `ask` (default) or `always_allow`
+- **Bash command approval** - Bash tool requires explicit permission
 
 ### Can I use it offline?
 
@@ -356,6 +510,32 @@ Agent agent = new Agent(apiKey, model)
 agent.registerTool(new MyCustomTool())
 ```
 
+### How do I create a custom skill?
+
+Skills are reusable agent workflows:
+
+```groovy
+class MySkill implements Skill {
+    String getName() { "my-skill" }
+    String getDescription() { "Perform my custom task" }
+    List<Parameter> getParameters() {
+        return [
+            new Parameter("target", "Target file or directory", true)
+        ]
+    }
+    String execute(Map<String, Object> args, Agent agent) {
+        // Skill implementation
+        return agent.run("Perform the task on ${args.target}")
+    }
+}
+```
+
+Register the skill:
+
+```groovy
+SkillRegistry.register(new MySkill())
+```
+
 ### Troubleshooting
 
 **Issue**: "API Key not found"
@@ -369,6 +549,9 @@ agent.registerTool(new MyCustomTool())
 
 **Issue**: "Tool execution failed"
 - **Solution**: Check file permissions and ensure files are within the project directory
+
+**Issue**: "TUI failed to start"
+- **Solution**: Use `--simple` flag for console mode, or check terminal size requirements
 
 ## Documentation
 
@@ -391,9 +574,10 @@ MIT License
 - Inspired by [SST OpenCode](https://github.com/sst/opencode)
 - Built with [JBang](https://jbang.dev/)
 - Powered by [Z.ai GLM-4](https://open.bigmodel.cn/) and [OpenCode Zen](https://opencode.ai/)
+- Architecture inspired by [Google Gemini CLI](https://github.com/google-gemini/gemini-cli)
 
 ---
 
 **Join our community** | [Discussions](https://discord.gg/rJfNM4bUx6)
 
-🚀 You've been invited to join the GLM Coding Plan! Enjoy full support for Claude Code, Cline, and 10+ top coding tools — starting at just $3/month. Subscribe now and grab the limited-time deal! Link： https://z.ai/subscribe?ic=CQBKX9KCLF
+🚀 You've been invited to join the GLM Coding Plan! Enjoy full support for Claude Code, Cline, and 10+ top coding tools — starting at just $3/month. Subscribe now and grab the limited-time deal! Link: https://z.ai/subscribe?ic=CQBKX9KCLF
