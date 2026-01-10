@@ -87,7 +87,7 @@ class AgentConfig {
             name: "explore",
             type: AgentType.EXPLORE,
             description: "Fast agent specialized for exploring codebases. Use glob and grep to find files and code patterns.",
-            deniedTools: ["write_file", "edit_file", "todo_write", "todo_read"],
+            deniedTools: ["write_file", "edit_file", "todo_write", "todo_read", "task"],
             allowedTools: ["read_file", "glob", "grep", "list_files"],
             maxTurns: 15,
             hidden: true
@@ -99,7 +99,7 @@ class AgentConfig {
             name: "general",
             type: AgentType.GENERAL,
             description: "Multi-step task execution subagent.",
-            deniedTools: ["todo_write", "todo_read"],
+            deniedTools: ["todo_write", "todo_read", "task"],
             maxTurns: 20,
             hidden: true
         )

@@ -1,8 +1,10 @@
 package core
 
 import models.Session
+import models.Message
 import groovy.sql.Sql
 import java.nio.file.Files
+import java.text.SimpleDateFormat
 
 @Singleton(strict=false)
 class SessionManager {
@@ -108,10 +110,11 @@ class SessionManager {
         def sessionId = generateSessionId()
         def projectHash = RootDetector.findGitRoot(directory) ?: "global"
         def now = new Date()
+        def title = generateSessionTitle(directory, agentType)
 
         database.execute(
-            "INSERT INTO sessions (id, project_hash, directory, agent_type, model, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            [sessionId, projectHash, directory, agentType, model, now, now]
+            "INSERT INTO sessions (id, project_hash, directory, agent_type, model, title, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            [sessionId, projectHash, directory, agentType, model, title, now, now]
         )
 
         database.execute(
@@ -214,6 +217,33 @@ class SessionManager {
         )
     }
 
+    void compactSession(String sessionId, List<Message> compactedHistory, String summary) {
+        try {
+            // Delete old messages for this session
+            database.execute("DELETE FROM messages WHERE session_id = ?", [sessionId])
+            
+            // Insert compacted messages
+            def now = new Date()
+            compactedHistory.each { message ->
+                def messageId = generateMessageId()
+                database.execute("""
+                    INSERT INTO messages (id, session_id, role, content, created_at)
+                    VALUES (?, ?, ?, ?, ?)
+                """, [messageId, sessionId, message.role, message.content ?: "", now])
+            }
+            
+            // Record compaction timestamp
+            database.execute("""
+                UPDATE token_stats SET last_compaction = ? WHERE session_id = ?
+            """, [now, sessionId])
+            
+            touchSession(sessionId)
+        } catch (Exception e) {
+            System.err.println("Error compacting session: ${e.message}")
+            throw e
+        }
+    }
+
     Sql getDatabase() {
         return database
     }
@@ -228,5 +258,25 @@ class SessionManager {
 
     private String generateSessionId() {
         return "ses_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16)
+    }
+
+    private String generateSessionTitle(String directory, String agentType) {
+        def projectHash = RootDetector.findGitRoot(directory)
+        String projectName
+
+        if (projectHash) {
+            def gitDir = new File(projectHash)
+            projectName = gitDir.name
+        } else {
+            def dir = new File(directory)
+            projectName = dir.name ?: "Global"
+        }
+
+        def timestamp = new SimpleDateFormat("HH:mm").format(new Date())
+        return "${projectName} (${agentType}) - ${timestamp}"
+    }
+
+    private String generateMessageId() {
+        return "msg_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16)
     }
 }

@@ -39,6 +39,10 @@ import tui.jexer.widgets.JexerCommandInput
 import tui.jexer.widgets.JexerAutocompletePopup
 import tui.jexer.widgets.JexerStatusBar
 import tui.jexer.widgets.JexerSidebar
+import tui.jexer.widgets.JexerCommandPalette
+import tui.shared.CommandProvider
+import tui.shared.CommandItem
+import tui.shared.KeybindManager
 import static jexer.TKeypress.*
 
 /**
@@ -73,6 +77,7 @@ class JexerTUI extends TApplication {
     // State
     private boolean sidebarEnabled = true
     private volatile boolean running = true
+    private KeybindManager keybindManager = new KeybindManager()
 
     /**
      * Create the Jexer application with dark theme.
@@ -128,6 +133,12 @@ class JexerTUI extends TApplication {
                     activityLog.appendSystemMessage("Log exported to: ${exportPath}")
                 }
             }
+            return true
+        }
+
+        // Ctrl+P: Show command palette
+        if (keypress.getKey().equals(kbCtrlP)) {
+            showCommandPalette()
             return true
         }
 
@@ -427,13 +438,13 @@ class JexerTUI extends TApplication {
      * Handle slash commands.
      */
     private void handleSlashCommand(String input) {
-        def parsed = CommandProvider.parse(input)
+        def parsed = CommandProvider.parseSlashCommand(input)
         if (!parsed) {
             activityLog.appendSystemMessage("Unknown command: ${input}")
             return
         }
 
-        String command = parsed.name.toLowerCase()
+        String command = parsed.command.toLowerCase()
         String args = parsed.arguments ?: ''
 
         switch (command) {
@@ -624,6 +635,7 @@ class JexerTUI extends TApplication {
         activityLog.appendSystemMessage('/exit     - Exit TUI')
         activityLog.appendSystemMessage('')
         activityLog.appendSystemMessage('Keyboard shortcuts:')
+        activityLog.appendSystemMessage('Ctrl+P     - Open command palette')
         activityLog.appendSystemMessage('Tab        - Switch agent forward')
         activityLog.appendSystemMessage('Shift+Tab  - Switch agent backward')
         activityLog.appendSystemMessage('Ctrl+S     - Export activity log')
@@ -637,6 +649,128 @@ class JexerTUI extends TApplication {
         if (!sidebarPanel) return
         sidebarPanel.toggle()
         activityLog.appendSystemMessage(sidebarPanel.getExpanded() ? 'Sidebar shown' : 'Sidebar hidden')
+    }
+
+    /**
+     * Show command palette dialog.
+     */
+    void showCommandPalette() {
+        def palette = new JexerCommandPalette(this, keybindManager) { CommandItem cmd ->
+            executeCommandItem(cmd)
+        }
+        addWindow(palette)
+    }
+
+    /**
+     * Execute command selected from command palette.
+     */
+    private void executeCommandItem(CommandItem cmd) {
+        if (!cmd) return
+        
+        if (cmd.slashCommand) {
+            handleSlashCommand(cmd.slashCommand)
+        } else if (cmd.onSelect != null) {
+            cmd.onSelect.call()
+        } else {
+            handleCommandById(cmd.id)
+        }
+    }
+
+    /**
+     * Handle command execution by ID.
+     */
+    private void handleCommandById(String commandId) {
+        switch (commandId) {
+            case 'session.new':
+                activityLog.clear()
+                activityLog.appendWelcomeMessage(currentModel)
+                activityLog.appendSystemMessage('Started new session')
+                break
+            
+            case 'session.clear':
+                activityLog.clear()
+                activityLog.appendWelcomeMessage(currentModel)
+                activityLog.appendSystemMessage('Chat history cleared')
+                break
+            
+            case 'session.export':
+                String exportPath = activityLog.exportLog()
+                if (exportPath) {
+                    activityLog.appendSystemMessage("Log exported to: ${exportPath}")
+                }
+                break
+            
+            case 'session.rename':
+                activityLog.appendSystemMessage('Rename session: not yet implemented')
+                break
+            
+            case 'session.share':
+                activityLog.appendSystemMessage('Share session: not yet implemented')
+                break
+            
+            case 'model.select':
+                showModels()
+                break
+            
+            case 'model.show':
+                activityLog.appendSystemMessage("Current model: ${currentModel}")
+                break
+            
+            case 'model.info':
+                activityLog.appendSystemMessage("Model: ${currentModel}")
+                activityLog.appendSystemMessage("Provider: ${providerId}")
+                activityLog.appendSystemMessage("Model ID: ${modelId}")
+                break
+            
+            case 'tools.list':
+                activityLog.appendSystemMessage('Available tools:')
+                tools.each { tool ->
+                    activityLog.appendSystemMessage("  • ${tool.name}")
+                }
+                break
+            
+            case 'tools.search':
+                activityLog.appendSystemMessage('Use /search <query> to search web')
+                break
+            
+            case 'tools.context':
+                activityLog.appendSystemMessage("Working directory: ${currentCwd}")
+                activityLog.appendSystemMessage("Session ID: ${sessionId}")
+                break
+            
+            case 'nav.sidebar':
+                toggleSidebar()
+                break
+            
+            case 'nav.home':
+                activityLog.scrollToTop()
+                break
+            
+            case 'nav.end':
+                activityLog.scrollToBottom()
+                break
+            
+            case 'system.help':
+                showHelp()
+                break
+            
+            case 'system.config':
+                activityLog.appendSystemMessage('Configuration loaded')
+                break
+            
+            case 'system.exit':
+                core.SessionManager.instance?.shutdown()
+                running = false
+                exit()
+                break
+            
+            case 'system.debug':
+                activityLog.appendSystemMessage('Debug mode toggled')
+                break
+            
+            default:
+                activityLog.appendSystemMessage("Unknown command ID: ${commandId}")
+        }
     }
 
     /**

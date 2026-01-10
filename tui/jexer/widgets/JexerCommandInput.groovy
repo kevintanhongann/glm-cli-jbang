@@ -74,6 +74,11 @@ class JexerCommandInput extends TField {
             return
         }
 
+        // Ctrl+P - let it pass through to parent for command palette
+        if (keypress.getKey().equals(kbCtrlP)) {
+            return
+        }
+
         // Space closes autocomplete
         if (ch == ' ' && autocompletePopup != null) {
             autocompletePopup.showPopup(false)
@@ -299,7 +304,7 @@ class JexerCommandInput extends TField {
         String before = triggerPosition > 0 ? currentText.substring(0, triggerPosition) : ''
         String after = cursorPos < currentText.length() ? currentText.substring(cursorPos) : ''
 
-        String insertion = triggerType + item.value + ' '
+        String insertion = item.value.startsWith(triggerType) ? item.value + ' ' : triggerType + item.value + ' '
         String newText = before + insertion + after
 
         setText(newText)

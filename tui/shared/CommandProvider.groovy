@@ -1,93 +1,131 @@
 package tui.shared
 
-/**
- * Provides slash command definitions.
- * Similar to SST OpenCode's command system.
- */
 class CommandProvider {
 
-    private static final List<CommandDefinition> COMMANDS = [
-        // Session commands
-        new CommandDefinition('help', 'Show available commands'),
-        new CommandDefinition('clear', 'Clear chat history'),
-        new CommandDefinition('new', 'Start new conversation'),
-        new CommandDefinition('exit', 'Exit the TUI'),
+    private static final List<CommandItem> DEFAULT_COMMANDS = [
+        new CommandItem('session.new', 'New session', 'Start a new conversation', 'Session', 
+                        'session_new', '/new', false, false, null),
+        new CommandItem('session.clear', 'Clear history', 'Clear chat history', 'Session',
+                        'clear', '/clear', false, false, null),
+        new CommandItem('session.export', 'Export chat', 'Export conversation to file', 'Session',
+                        'export', '/export', false, false, null),
+        new CommandItem('session.rename', 'Rename session', 'Rename current session', 'Session',
+                        null, '/rename', false, false, null),
+        new CommandItem('session.share', 'Share session', 'Share session URL', 'Session',
+                        null, '/share', true, false, null),
         
-        // Model commands
-        new CommandDefinition('model', 'Show or change current model'),
-        new CommandDefinition('models', 'List available models'),
+        new CommandItem('model.select', 'Switch model', 'Open model selection dialog', 'Model',
+                        'model', '/models', true, false, null),
+        new CommandItem('model.show', 'Show model', 'Display current model', 'Model',
+                        null, '/model', false, false, null),
+        new CommandItem('model.info', 'Model info', 'Show model details', 'Model',
+                        null, null, false, false, null),
         
-        // File commands
-        new CommandDefinition('read', 'Read a file', 'read <path>'),
-        new CommandDefinition('ls', 'List files in directory', 'ls [path]'),
+        new CommandItem('tools.list', 'List tools', 'Show available tools', 'Tools',
+                        null, '/tools', false, false, null),
+        new CommandItem('tools.search', 'Search web', 'Search the web', 'Tools',
+                        null, '/search', true, false, null),
+        new CommandItem('tools.skills', 'List skills', 'Show available skills', 'Tools',
+                        null, '/skill', false, false, null),
+        new CommandItem('tools.context', 'Show context', 'Display current context', 'Tools',
+                        null, '/context', false, false, null),
         
-        // Tool commands
-        new CommandDefinition('tools', 'List available tools'),
-        new CommandDefinition('search', 'Search the web', 'search <query>'),
-        new CommandDefinition('skill', 'List or show skill details', 'skill [list | skill-name]'),
+        new CommandItem('nav.sidebar', 'Toggle sidebar', 'Show/hide sidebar', 'Navigation',
+                        'sidebar', '/sidebar', true, false, null),
+        new CommandItem('nav.home', 'Jump to start', 'Scroll to top', 'Navigation',
+                        'home', '/home', false, false, null),
+        new CommandItem('nav.end', 'Jump to end', 'Scroll to bottom', 'Navigation',
+                        'end', '/end', false, false, null),
         
-        // Context commands
-        new CommandDefinition('context', 'Show current context'),
-        new CommandDefinition('cwd', 'Show/change working directory'),
-        
-        // Configuration
-        new CommandDefinition('config', 'Show configuration'),
-        new CommandDefinition('theme', 'Change color theme'),
-        
-        // Undo/Redo
-        new CommandDefinition('undo', 'Undo last action'),
-        new CommandDefinition('redo', 'Redo last undone action'),
-        
-        // Export
-        new CommandDefinition('export', 'Export conversation', 'export [format]'),
-        new CommandDefinition('copy', 'Copy last response to clipboard'),
-        
-        // Debug
-        new CommandDefinition('debug', 'Toggle debug mode'),
-        new CommandDefinition('verbose', 'Toggle verbose output'),
+        new CommandItem('system.help', 'Show help', 'Display help dialog', 'System',
+                        'help', '/help', true, false, null),
+        new CommandItem('system.config', 'Show config', 'Display configuration', 'System',
+                        null, '/config', false, false, null),
+        new CommandItem('system.exit', 'Exit TUI', 'Exit the application', 'System',
+                        'exit', '/exit', false, false, null),
+        new CommandItem('system.debug', 'Toggle debug', 'Toggle debug mode', 'System',
+                        null, '/debug', false, false, null),
     ]
 
-    /**
-     * Get all available commands.
-     */
-    static List<AutocompleteItem> getCommands() {
-        COMMANDS.collect { cmd ->
-            AutocompleteItem.command(cmd.name, cmd.description)
+    private static final List<CommandItem> customCommands = []
+    private static final Map<String, CommandItem> commandMap = [:]
+
+    static {
+        rebuildCommandMap()
+    }
+
+    static void rebuildCommandMap() {
+        commandMap.clear()
+        DEFAULT_COMMANDS.each { cmd ->
+            commandMap[cmd.id] = cmd
+        }
+        customCommands.each { cmd ->
+            commandMap[cmd.id] = cmd
         }
     }
 
-    /**
-     * Get commands matching a query.
-     */
-    static List<AutocompleteItem> getCommands(String query) {
+    static List<CommandItem> getAllCommands() {
+        return DEFAULT_COMMANDS + customCommands
+    }
+
+    static List<CommandItem> getCommandsByCategory(String category) {
+        return getAllCommands().findAll { it.category == category }
+    }
+
+    static List<CommandItem> getSuggestedCommands() {
+        return getAllCommands().findAll { it.suggested && !it.disabled }
+    }
+
+    static List<CommandItem> filterCommands(String query) {
         if (!query || query.isEmpty()) {
-            return getCommands()
+            return getAllCommands().findAll { !it.disabled }
         }
         
         String lowerQuery = query.toLowerCase()
-        return COMMANDS
-            .findAll { it.name.toLowerCase().startsWith(lowerQuery) }
-            .collect { cmd -> AutocompleteItem.command(cmd.name, cmd.description) }
+        return getAllCommands().findAll { 
+            !it.disabled && (
+                it.title.toLowerCase().contains(lowerQuery) ||
+                it.description.toLowerCase().contains(lowerQuery) ||
+                it.category.toLowerCase().contains(lowerQuery) ||
+                it.slashCommand?.toLowerCase()?.contains(lowerQuery)
+            )
+        }
     }
 
-    /**
-     * Check if a command exists.
-     */
-    static boolean exists(String name) {
-        COMMANDS.any { it.name == name }
+    static CommandItem getById(String id) {
+        return commandMap[id]
     }
 
-    /**
-     * Get command definition by name.
-     */
-    static CommandDefinition get(String name) {
-        COMMANDS.find { it.name == name }
+    static CommandItem getBySlashCommand(String slashCommand) {
+        return getAllCommands().find { it.slashCommand == slashCommand }
     }
 
-    /**
-     * Parse a command string into name and arguments.
-     */
-    static Map<String, Object> parse(String input) {
+    static void registerCommand(CommandItem command) {
+        customCommands << command
+        rebuildCommandMap()
+    }
+
+    static void unregisterCommand(String id) {
+        customCommands.removeIf { it.id == id }
+        rebuildCommandMap()
+    }
+
+    static Map<String, List<CommandItem>> getCommandsGroupedByCategory() {
+        Map<String, List<CommandItem>> grouped = [:]
+        getAllCommands().findAll { !it.disabled }.each { cmd ->
+            if (!grouped[cmd.category]) {
+                grouped[cmd.category] = []
+            }
+            grouped[cmd.category] << cmd
+        }
+        return grouped
+    }
+
+    static List<String> getAllCategories() {
+        return getAllCommands()*.category.unique().sort()
+    }
+
+    static Map<String, Object> parseSlashCommand(String input) {
         if (!input || !input.startsWith('/')) {
             return null
         }
@@ -96,21 +134,12 @@ class CommandProvider {
         String[] parts = trimmed.split(/\s+/, 2)
         
         return [
-            name: parts[0],
+            command: parts[0],
             arguments: parts.length > 1 ? parts[1] : ''
         ]
     }
-}
 
-class CommandDefinition {
-    String name
-    String description
-    String usage
-    boolean disabled = false
-
-    CommandDefinition(String name, String description, String usage = null) {
-        this.name = name
-        this.description = description
-        this.usage = usage ?: "/${name}"
+    static boolean existsSlashCommand(String commandName) {
+        return getAllCommands().any { it.slashCommand == "/${commandName}" || it.slashCommand == commandName }
     }
 }

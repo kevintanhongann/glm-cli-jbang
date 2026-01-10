@@ -1,4 +1,4 @@
-package glm.core
+package core
 
 class AgentState {
     static final String CURRENT_STEP = "agent.currentStep"

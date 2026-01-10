@@ -5,16 +5,18 @@ import groovy.sql.Sql
 
 @Singleton(strict=false)
 class MessageStore {
-    private Sql database
-
-    MessageStore() {
-        this.database = SessionManager.instance.getDatabase()
+    private Sql getDb() {
+        def sm = SessionManager.instance
+        if (!sm) {
+            throw new IllegalStateException("SessionManager not initialized")
+        }
+        return sm.database
     }
 
     String saveMessage(String sessionId, ModelMessage message) {
         def messageId = generateMessageId()
 
-        database.execute("""
+        getDb().execute("""
             INSERT INTO messages
             (id, session_id, role, content, created_at, parent_id, tokens_input, tokens_output, finish_reason, metadata)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -39,7 +41,7 @@ class MessageStore {
     String saveMessage(String sessionId, ModelMessage message, int inputTokens, int outputTokens, String finishReason = null) {
         def messageId = generateMessageId()
 
-        database.execute("""
+        getDb().execute("""
             INSERT INTO messages
             (id, session_id, role, content, created_at, parent_id, tokens_input, tokens_output, finish_reason, metadata)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -70,7 +72,7 @@ class MessageStore {
             params << limit
         }
 
-        def rows = database.rows(sql, params)
+        def rows = getDb().rows(sql, params)
 
         return rows.collect { row ->
             def msg = new ModelMessage(row.role, row.content)
@@ -79,7 +81,7 @@ class MessageStore {
     }
 
     ModelMessage getMessage(String messageId) {
-        def row = database.firstRow(
+        def row = getDb().firstRow(
             "SELECT * FROM messages WHERE id = ?",
             [messageId]
         )
@@ -90,15 +92,15 @@ class MessageStore {
     }
 
     void deleteMessage(String messageId) {
-        database.execute("DELETE FROM messages WHERE id = ?", [messageId])
+        getDb().execute("DELETE FROM messages WHERE id = ?", [messageId])
     }
 
     void deleteMessagesForSession(String sessionId) {
-        database.execute("DELETE FROM messages WHERE session_id = ?", [sessionId])
+        getDb().execute("DELETE FROM messages WHERE session_id = ?", [sessionId])
     }
 
     int getMessageCount(String sessionId) {
-        def row = database.firstRow(
+        def row = getDb().firstRow(
             "SELECT COUNT(*) as count FROM messages WHERE session_id = ?",
             [sessionId]
         )

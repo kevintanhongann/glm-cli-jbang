@@ -301,6 +301,13 @@ class ActivityLogPanel {
         updateDisplay()
     }
 
+    void appendInfo(String message) {
+        synchronized (content) {
+            content.append("ℹ️  ${message}\n")
+        }
+        updateDisplay()
+    }
+
     void removeStatus() {
         if (statusLine != null) {
             synchronized (content) {
@@ -590,6 +597,76 @@ class ActivityLogPanel {
         synchronized (content) {
             content = new StringBuilder()
             insideThinkTag = false
+        }
+        updateDisplay()
+    }
+
+    void appendSubagentStart(String agentType, String task) {
+        synchronized (content) {
+            content.append("  🤖 Launching ${AnsiColors.cyan(agentType.toUpperCase())} agent...\n")
+            content.append("     Task: ${task}\n")
+        }
+        updateDisplay()
+    }
+
+    void appendParallelAgentStart(List<Map<String, String>> tasks) {
+        synchronized (content) {
+            content.append("  🤖 Launching ${tasks.size()} parallel agents...\n")
+            tasks.eachWithIndex { task, idx ->
+                content.append("     ${idx + 1}. ${AnsiColors.cyan(task.agent_type?.toUpperCase())}\n")
+            }
+        }
+        updateDisplay()
+    }
+
+    void appendSubagentProgress(String agentId, String status) {
+        synchronized (content) {
+            content.append("     • ${agentId.take(12)}: ${status}\n")
+        }
+        updateDisplay()
+    }
+
+    void appendSubagentResult(String agentType, String result, boolean success,
+                          int turns, long duration, String sessionId) {
+        synchronized (content) {
+            String icon = success ? "✓" : "✗"
+            content.append("  ${icon} ${AnsiColors.cyan(agentType.toUpperCase())} agent complete\n")
+            content.append("     Turns: ${turns} | Duration: ${duration}ms\n")
+            content.append("     Session: ${sessionId.take(12)}...\n")
+            content.append("     Result: ${result.take(150)}...\n")
+            content.append("\n")
+        }
+        updateDisplay()
+    }
+
+    void appendSubagentSummary(List results) {
+        synchronized (content) {
+            content.append("╔═════════════════════════════════════════════════════════╗\n")
+            content.append("║             Subagent Execution Summary                    ║\n")
+            content.append("╚═════════════════════════════════════════════════════════╝\n")
+            content.append("\n")
+
+            results.eachWithIndex { result, idx ->
+                String icon = result.success ? "✓" : "✗"
+                content.append("Agent ${idx + 1} (${AnsiColors.cyan(result.configName)}):\n")
+                content.append("  Status: ${icon} ${result.success ? 'Success' : 'Failed'}\n")
+                content.append("  Duration: ${result.duration}ms\n")
+
+                if (result.history) {
+                    int turns = result.history.size() / 2
+                    content.append("  Turns: ${turns}\n")
+                }
+
+                if (result.result) {
+                    content.append("  Result: ${result.result.take(100)}...\n")
+                }
+
+                if (result.error) {
+                    content.append("  Error: ${result.error}\n")
+                }
+
+                content.append("\n")
+            }
         }
         updateDisplay()
     }

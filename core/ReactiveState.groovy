@@ -1,4 +1,4 @@
-package glm.core
+package core
 
 import java.util.ArrayList
 import java.util.function.Consumer

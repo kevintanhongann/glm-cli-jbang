@@ -1,4 +1,4 @@
-package glm.core
+package core
 
 import java.util.concurrent.ConcurrentHashMap
 

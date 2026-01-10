@@ -79,7 +79,7 @@ class ChatCommand implements Runnable {
 
         // Initialize session management
         sessionManager = SessionManager.instance
-        messageStore = new MessageStore()
+        messageStore = MessageStore.instance
 
         // Create or resume session
         if (sessionId && !newSession) {

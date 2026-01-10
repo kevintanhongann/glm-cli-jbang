@@ -8,6 +8,7 @@ import com.googlecode.lanterna.TerminalPosition
 import tui.LanternaTUI
 import tui.LanternaTheme
 import tui.shared.AutocompleteItem
+import tui.shared.AutocompleteItemType
 import tui.shared.FileProvider
 import tui.shared.CommandProvider
 
@@ -146,6 +147,15 @@ class CommandInputPanel {
                 key.isCtrlDown() && keyType == KeyType.Character && key.getCharacter() == 'm') {
                 Thread.start {
                     tui.showModelSelectionDialog()
+                }
+                return false
+            }
+
+            // Ctrl+P to show command palette
+            if (!autocompletePopup.isVisible() &&
+                key.isCtrlDown() && keyType == KeyType.Character && key.getCharacter() == 'p') {
+                Thread.start {
+                    tui.showCommandPalette()
                 }
                 return false
             }
@@ -342,7 +352,11 @@ class CommandInputPanel {
     }
 
     private void showCommandAutocomplete() {
-        List<AutocompleteItem> items = CommandProvider.getCommands()
+        List<AutocompleteItem> items = CommandProvider.getAllCommands().collect { cmd ->
+            String displayName = cmd.slashCommand ?: cmd.title
+            String description = cmd.description ? " - ${cmd.description}" : ""
+            new AutocompleteItem(displayName, displayName, AutocompleteItemType.COMMAND, description)
+        }
         autocompletePopup.loadItems(items, '/')
 
         TerminalPosition popupPos = calculatePopupPosition()
@@ -384,7 +398,7 @@ class CommandInputPanel {
         String before = triggerPosition > 0 ? currentText.substring(0, triggerPosition) : ''
         String after = cursorPos < currentText.length() ? currentText.substring(cursorPos) : ''
 
-        String insertion = triggerType + item.value + ' '
+        String insertion = item.value.startsWith(triggerType) ? item.value + ' ' : triggerType + item.value + ' '
 
         String newText = before + insertion + after
         inputBox.setText(newText)

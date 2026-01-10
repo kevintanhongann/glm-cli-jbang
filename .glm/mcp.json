@@ -1,0 +1,21 @@
+{
+  "mcp_everything": {
+    "type": "local",
+    "command": ["npx", "-y", "@modelcontextprotocol/server-everything"],
+    "environment": {},
+    "enabled": true,
+    "timeout": 30000
+  },
+  "context7": {
+    "type": "remote",
+    "url": "https://mcp.context7.com/mcp",
+    "enabled": false,
+    "headers": {
+      "CONTEXT7_API_KEY": "{env:CONTEXT7_API_KEY}"
+    },
+    "oauth": {
+      "authorization_endpoint": "https://auth.context7.com/oauth/authorize",
+      "token_endpoint": "https://auth.context7.com/oauth/token"
+    }
+  }
+}

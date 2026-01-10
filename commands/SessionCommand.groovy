@@ -166,7 +166,7 @@ class SessionInfoCommand implements Runnable {
             return
         }
 
-        def messageStore = new MessageStore()
+        def messageStore = MessageStore.instance
         def tokenTracker = new TokenTracker()
 
         def messages = messageStore.getMessages(sessionId)

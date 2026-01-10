@@ -16,10 +16,13 @@ import core.Instructions
 import core.ModelCatalog
 import core.SessionStatsManager
 import core.TokenTracker
+import core.SessionManager
+import core.MessageStore
 import core.LspManager as SidebarLspManager
 import core.LSPManager as LspClientManager
 import core.LSPClient
 import core.SkillRegistry
+import core.SubagentSessionManager
 import models.ChatRequest
 import models.ChatResponse
 import models.Message
@@ -42,7 +45,13 @@ import tui.lanterna.widgets.SidebarPanel
 import tui.lanterna.widgets.ModelSelectionDialog
 import tui.lanterna.widgets.HeaderPanel
 import tui.lanterna.widgets.FooterPanel
+import tui.lanterna.widgets.CommandPaletteDialog
+import tui.lanterna.widgets.SessionSelectDialog
 import tui.shared.CommandProvider
+import tui.shared.CommandItem
+import tui.shared.KeybindManager
+import tui.lanterna.layout.ResponsiveLayoutManager
+import tui.shared.TuiContext
 
 class LanternaTUI {
 
@@ -65,6 +74,9 @@ class LanternaTUI {
     private Config config
     private GlmClient client
     private ObjectMapper mapper = new ObjectMapper()
+    private MessageStore messageStore
+    private SessionManager sessionManager
+    private List<Message> loadedHistory = []
 
     // Cancellation support
     private java.util.concurrent.atomic.AtomicBoolean isGenerating = new java.util.concurrent.atomic.AtomicBoolean(false)
@@ -75,6 +87,10 @@ class LanternaTUI {
     private volatile boolean running = true
     private Thread sidebarRefreshThread
     private tui.lanterna.widgets.Tooltip activeTooltip
+    private KeybindManager keybindManager = new KeybindManager()
+    private SubagentSessionManager subagentManager = SubagentSessionManager.instance
+    private Timer subagentStatusTimer
+    private ResponsiveLayoutManager layoutManager = new ResponsiveLayoutManager()
 
     LanternaTUI() throws Exception {
         this.currentCwd = System.getProperty('user.dir')
@@ -112,11 +128,9 @@ class LanternaTUI {
 
     void start(String model = 'opencode/big-pickle', String cwd = null) {
         this.currentModel = model
-        this.sessionId = core.SessionManager.instance.createSession(
-            currentCwd ?: System.getProperty('user.dir'),
-            'BUILD',
-            model
-        )
+        this.currentCwd = cwd ?: System.getProperty('user.dir')
+        this.sessionManager = core.SessionManager.instance
+        this.messageStore = MessageStore.instance
 
         def parts = model.split('/', 2)
         if (parts.length == 2) {
@@ -127,8 +141,6 @@ class LanternaTUI {
             this.providerId = 'opencode'
             this.modelId = parts[0]
         }
-
-        this.currentCwd = cwd ?: System.getProperty('user.dir')
 
         if (!initClient()) {
             System.err.println('Failed to initialize client')
@@ -146,8 +158,32 @@ class LanternaTUI {
 
             setupMainWindow()
 
-            // Add global key interceptor for ESC
+            // Show session selection dialog
+            def dialog = new SessionSelectDialog(textGUI, currentCwd)
+            def selectedSessionId = dialog.show()
+            if (selectedSessionId == null) {
+                // New session
+                this.sessionId = sessionManager.createSession(currentCwd, 'BUILD', model)
+                loadedHistory = []
+            } else {
+                // Load existing session
+                this.sessionId = selectedSessionId
+                loadSessionHistory(selectedSessionId)
+            }
+
+            setupUI()
+
+            setupResizeListener()
+            initializeLspTracking()
+            initSubagentTracking()
+            startSidebarRefreshThread()
+
+            textGUI.waitForWindowToClose(mainWindow)
+            setupUI()
+
+            // Add global key interceptor for ESC and Ctrl+P
             mainWindow.addWindowListener(new WindowListenerAdapter() {
+
                 @Override
                 void onInput(Window basePane, com.googlecode.lanterna.input.KeyStroke keyStroke, java.util.concurrent.atomic.AtomicBoolean hasBeenHandled) {
                     if (keyStroke.getKeyType() == com.googlecode.lanterna.input.KeyType.Escape) {
@@ -156,22 +192,67 @@ class LanternaTUI {
                             hasBeenHandled.set(true)
                         }
                     }
+                    // Handle Ctrl+P for command palette
+                    if (keyStroke.isCtrlDown() &&
+                        keyStroke.getKeyType() == com.googlecode.lanterna.input.KeyType.Character &&
+                        keyStroke.getCharacter() == 'p') {
+                        Thread.start {
+                            showCommandPalette()
+                        }
+                        hasBeenHandled.set(true)
+                    }
+                    // Handle Ctrl+B for sidebar toggle
+                    if (keyStroke.isCtrlDown() &&
+                        keyStroke.getKeyType() == com.googlecode.lanterna.input.KeyType.Character &&
+                        keyStroke.getCharacter() == 'b') {
+                        toggleSidebarMode()
+                        hasBeenHandled.set(true)
+                    }
+                    // Handle Ctrl+T for toggle thinking
+                    if (keyStroke.isCtrlDown() &&
+                        keyStroke.getKeyType() == com.googlecode.lanterna.input.KeyType.Character &&
+                        keyStroke.getCharacter() == 't') {
+                        TuiContext.getInstance().setShowThinking(!TuiContext.getInstance().isShowThinking())
+                        activityLogPanel?.appendInfo("Thinking: ${TuiContext.getInstance().isShowThinking() ? 'ON' : 'OFF'}")
+                        hasBeenHandled.set(true)
+                    }
+                    // Handle Ctrl+Shift+T for toggle timestamps
+                    if (keyStroke.isCtrlDown() && keyStroke.isShiftDown() &&
+                        keyStroke.getKeyType() == com.googlecode.lanterna.input.KeyType.Character &&
+                        keyStroke.getCharacter() == 't') {
+                        TuiContext.getInstance().setShowTimestamps(!TuiContext.getInstance().isShowTimestamps())
+                        activityLogPanel?.appendInfo("Timestamps: ${TuiContext.getInstance().isShowTimestamps() ? 'ON' : 'OFF'}")
+                        hasBeenHandled.set(true)
+                    }
+                    // Handle Ctrl+D for toggle diff view
+                    if (keyStroke.isCtrlDown() &&
+                        keyStroke.getKeyType() == com.googlecode.lanterna.input.KeyType.Character &&
+                        keyStroke.getCharacter() == 'd') {
+                        String currentMode = TuiContext.getInstance().getDiffViewMode()
+                        String newMode = currentMode == "split" ? "unified" : "split"
+                        TuiContext.getInstance().setDiffViewMode(newMode)
+                        activityLogPanel?.appendInfo("Diff view: ${newMode}")
+                        hasBeenHandled.set(true)
+                    }
                 }
+
             })
 
             setupUI()
 
             setupResizeListener()
             initializeLspTracking()
+            initSubagentTracking()
             startSidebarRefreshThread()
 
             textGUI.waitForWindowToClose(mainWindow)
         } catch (Exception e) {
             System.err.println("TUI Error: ${e.message}")
-            e.printStackTrace()
         } finally {
             running = false
             core.SessionManager.instance?.shutdown()
+            subagentStatusTimer?.cancel()
+            subagentStatusTimer = null
             if (screen != null) {
                 screen.stopScreen()
             }
@@ -362,10 +443,14 @@ class LanternaTUI {
             TerminalSize size = screen.getTerminalSize()
             int terminalWidth = size.getColumns()
 
-            if (sidebarEnabled && terminalWidth >= 80) {
-                int sidebarWidth = Math.min(30, terminalWidth / 4)
-                sidebarPanel = new SidebarPanel(textGUI, sessionId, sidebarWidth)
-                sidebarPanel.setPreferredSize(new TerminalSize(sidebarWidth, 0))
+            if (sidebarEnabled) {
+                sidebarPanel = new SidebarPanel(textGUI, sessionId, 42)
+                sidebarPanel.setPreferredSize(new TerminalSize(42, 0))
+                
+                // Only show if meets threshold
+                if (!layoutManager.isSidebarVisible(terminalWidth)) {
+                    sidebarPanel.setVisible(false)
+                }
 
                 contentPanel.addComponent(sidebarPanel, BorderLayout.Location.RIGHT)
             }
@@ -378,16 +463,10 @@ class LanternaTUI {
             int terminalWidth = newSize.getColumns()
             int terminalHeight = newSize.getRows()
 
-            if (sidebarEnabled && terminalWidth >= 80) {
-                if (sidebarPanel == null) {
-                    Panel contentPanel = (Panel) mainWindow.getComponent().getChildren().get(1) // Header is 0, Content is 1
-                    setupSidebar(contentPanel)
-                } else {
-                    int sidebarWidth = Math.min(30, terminalWidth / 4)
-                    sidebarPanel.setPreferredSize(new TerminalSize(sidebarWidth, 0))
-                }
-            } else if (!sidebarEnabled && sidebarPanel != null) {
-                sidebarPanel = null
+            if (sidebarPanel != null) {
+                // Update sidebar visibility based on responsive layout
+                boolean shouldShowSidebar = layoutManager.isSidebarVisible(terminalWidth)
+                sidebarPanel.setVisible(shouldShowSidebar)
             }
 
             if (activityLogPanel != null) {
@@ -415,6 +494,8 @@ class LanternaTUI {
                     TerminalSize newSize = screen.doResizeIfNecessary()
                     if (newSize != null) {
                         handleResize(newSize)
+                        // Notify TUI context of width change
+                        TuiContext.getInstance().notifyWidthChange(newSize.getColumns(), newSize.getRows())
                     }
                     Thread.sleep(100)
                 } catch (Exception e) {
@@ -424,11 +505,13 @@ class LanternaTUI {
         }
     }
 
-    private void updateHeader(int inputTokens, int outputTokens, int percentage, BigDecimal cost, int lspCount) {
+    private void updateHeader(int inputTokens, int outputTokens, int percentage, BigDecimal cost, int lspCount,
+                           int subagentRunning = 0, int subagentCompleted = 0, int subagentTotal = 0) {
         if (headerPanel != null) {
-            headerPanel.update(inputTokens, outputTokens, percentage, cost, lspCount)
+            headerPanel.update(inputTokens, outputTokens, percentage, cost, lspCount,
+                           subagentRunning, subagentCompleted, subagentTotal)
         }
-    }
+                           }
 
     private void updateFooter() {
         if (footerPanel != null) {
@@ -452,6 +535,30 @@ class LanternaTUI {
     // Handled by FooterPanel now
     }
 
+    private void initSubagentTracking() {
+        subagentStatusTimer = new Timer()
+        subagentStatusTimer.scheduleAtFixedRate({
+            updateSubagentUI()
+        } as java.util.TimerTask, 0, 500)
+    }
+
+    private void updateSubagentUI() {
+        if (textGUI?.getGUIThread() != null) {
+            textGUI.getGUIThread().invokeLater {
+                def activeSessions = subagentManager.getActiveSessions()
+                int running = activeSessions.count { it.status == 'running' }
+                int completed = subagentManager.getAllSessions().count { it.status == 'completed' }
+                int total = subagentManager.getAllSessions().size()
+
+                // Update header
+                headerPanel?.updateSubagentStatus(running, completed, total)
+
+                // Update sidebar
+                sidebarPanel?.subagentSection?.refresh()
+            }
+        }
+    }
+
     void cycleAgent(int direction = 1) {
         agentRegistry.cycleAgent(direction)
         activityLogPanel.appendStatus("Switched to ${agentRegistry.getCurrentAgentName()} agent")
@@ -461,7 +568,7 @@ class LanternaTUI {
     void cancelGeneration() {
         if (isGenerating.get() && !stopRequested.get()) {
             stopRequested.set(true)
-            activityLogPanel.appendStatus("Stopping generation...")
+            activityLogPanel.appendStatus('Stopping generation...')
         }
     }
 
@@ -484,6 +591,26 @@ class LanternaTUI {
         mainWindow.close()
     }
 
+    private void loadSessionHistory(String sessionId) {
+        loadedHistory = messageStore.getMessages(sessionId)
+        if (activityLogPanel != null) {
+            activityLogPanel.clear()
+            loadedHistory.each { msg ->
+                if (msg.role == 'user') {
+                    activityLogPanel.appendUserMessage(msg.content)
+                } else if (msg.role == 'assistant') {
+                    activityLogPanel.appendAIResponse(msg.content)
+                }
+            }
+        }
+    }
+
+    private void saveMessage(Message message) {
+        messageStore.saveMessage(sessionId, message)
+        sessionManager.touchSession(sessionId)
+        loadedHistory << message
+    }
+
     void processUserInput(String input, List<String> mentions = []) {
         // Handle slash commands
         if (input.startsWith('/')) {
@@ -499,13 +626,13 @@ class LanternaTUI {
     }
 
     private void handleSlashCommand(String input) {
-        def parsed = CommandProvider.parse(input)
+        def parsed = CommandProvider.parseSlashCommand(input)
         if (!parsed) {
             appendSystemMessage("Unknown command: ${input}")
             return
         }
 
-        String command = parsed.name
+        String command = parsed.command
         String args = parsed.arguments
 
         switch (command) {
@@ -565,6 +692,117 @@ class LanternaTUI {
         }
     }
 
+    void showCommandPalette() {
+        def dialog = new CommandPaletteDialog(textGUI, keybindManager) { CommandItem cmd ->
+            executeCommandItem(cmd)
+        }
+        CommandItem selected = dialog.show()
+    }
+
+    private void executeCommandItem(CommandItem cmd) {
+        if (!cmd) return
+
+        if (cmd.slashCommand) {
+            handleSlashCommand(cmd.slashCommand)
+        } else if (cmd.onSelect != null) {
+            cmd.onSelect.call()
+        } else {
+            handleCommandById(cmd.id)
+        }
+    }
+
+    private void handleCommandById(String commandId) {
+        switch (commandId) {
+            case 'session.new':
+                activityLogPanel.clear()
+                activityLogPanel.appendWelcomeMessage(currentModel)
+                appendSystemMessage('Started new session')
+                break
+
+            case 'session.export':
+                exportChat()
+                break
+
+            case 'session.rename':
+                appendSystemMessage('Rename session: not yet implemented')
+                break
+
+            case 'session.share':
+                appendSystemMessage('Share session: not yet implemented')
+                break
+
+            case 'model.select':
+                showModelSelectionDialog()
+                break
+
+            case 'model.show':
+                appendSystemMessage("Current model: ${currentModel}")
+                break
+
+            case 'model.info':
+                appendSystemMessage("Model: ${currentModel}")
+                appendSystemMessage("Provider: ${providerId}")
+                appendSystemMessage("Model ID: ${modelId}")
+                break
+
+            case 'tools.list':
+                appendSystemMessage('Available tools:')
+                tools.each { tool ->
+                    appendSystemMessage("  • ${tool.name}")
+                }
+                break
+
+            case 'tools.search':
+                appendSystemMessage('Use /search <query> to search the web')
+                break
+
+            case 'tools.skills':
+                handleSlashCommand('/skill list')
+                break
+
+            case 'tools.context':
+                appendSystemMessage("Working directory: ${currentCwd}")
+                appendSystemMessage("Session ID: ${sessionId}")
+                break
+
+            case 'nav.sidebar':
+                toggleSidebar()
+                break
+
+            case 'nav.home':
+                activityLogPanel.scrollToTop()
+                break
+
+            case 'nav.end':
+                activityLogPanel.scrollToBottom()
+                break
+
+            case 'system.help':
+                showHelp()
+                break
+
+            case 'system.config':
+                appendSystemMessage('Configuration loaded')
+                break
+
+            case 'system.exit':
+                handleSlashCommand('/exit')
+                break
+
+            case 'system.debug':
+                appendSystemMessage('Debug mode toggled')
+                break
+
+            default:
+                appendSystemMessage("Unknown command ID: ${commandId}")
+        }
+    }
+
+    private void exportChat() {
+        def dialog = new tui.lanterna.widgets.HelpDialog(textGUI)
+        appendSystemMessage('Export functionality not yet implemented')
+    }
+
     private void switchModel(String newModel) {
         try {
             def parts = newModel.split('/', 2)
@@ -605,10 +843,40 @@ class LanternaTUI {
             // Reinitialize client
             this.client = new GlmClient(newProviderId)
 
+            // Update UI components on GUI thread
+            if (textGUI?.getGUIThread() != null) {
+                textGUI.getGUIThread().invokeLater {
+                    headerPanel?.updateModel(newModel)
+                    footerPanel?.updateModel(newModel)
+                }
+            }
+
             activityLogPanel.appendSystemMessage("Switched to model: ${newModel}")
         } catch (Exception e) {
             activityLogPanel.appendSystemMessage("Error switching model: ${e.message}")
         }
+    }
+
+    private void toggleSidebarMode() {
+        String currentMode = layoutManager.getSidebarMode()
+        String newMode = currentMode == "auto" ? "hide" : "auto"
+        layoutManager.setSidebarMode(newMode)
+        
+        if (sidebarPanel != null) {
+            TerminalSize size = screen.getTerminalSize()
+            boolean shouldShow = layoutManager.isSidebarVisible(size.getColumns())
+            sidebarPanel.setVisible(shouldShow)
+            
+            if (textGUI?.getGUIThread() != null) {
+                textGUI.getGUIThread().invokeLater {
+                    mainWindow?.invalidate()
+                    textGUI.updateScreen()
+                }
+            }
+        }
+        
+        String statusMsg = newMode == "auto" ? "Sidebar: auto mode" : "Sidebar: hidden"
+        activityLogPanel?.appendInfo(statusMsg)
     }
 
     private void showHelp() {
@@ -622,6 +890,8 @@ class LanternaTUI {
         appendSystemMessage('/exit     - Exit TUI')
         appendSystemMessage('')
         appendSystemMessage('Keyboard shortcuts:')
+        appendSystemMessage('Ctrl+P   - Open command palette')
+        appendSystemMessage('Ctrl+B   - Toggle sidebar')
         appendSystemMessage('Ctrl+M   - Open model selection dialog')
         appendSystemMessage('Tab      - Switch agent')
         appendSystemMessage('Ctrl+C   - Clear input (exit if empty)')
@@ -673,6 +943,7 @@ class LanternaTUI {
         }
 
         messages << new Message('user', userInput)
+        saveMessage(new Message('user', userInput))
 
         // Get max steps from config (default 25, or unlimited if null)
         int maxIterations = config.behavior?.maxSteps ?: 25
@@ -695,40 +966,40 @@ class LanternaTUI {
         try {
             while (iteration < maxIterations) {
                 if (stopRequested.get()) {
-                    activityLogPanel.appendWarning("Generation stopped by user")
+                    activityLogPanel.appendWarning('Generation stopped by user')
                     break
                 }
 
                 iteration++
 
-            // Check if this is the last step
-            boolean isLastStep = (iteration >= maxIterations - 1)
+                // Check if this is the last step
+                boolean isLastStep = (iteration >= maxIterations - 1)
 
-            // At 80% of max iterations, warn user
-            if (iteration >= (maxIterations * 0.8) && iteration < maxIterations) {
-                int remaining = maxIterations - iteration
-                activityLogPanel.appendInfo("Step ${iteration}/${maxIterations} - ${remaining} steps remaining")
-            }
+                // At 80% of max iterations, warn user
+                if (iteration >= (maxIterations * 0.8) && iteration < maxIterations) {
+                    int remaining = maxIterations - iteration
+                    activityLogPanel.appendInfo("Step ${iteration}/${maxIterations} - ${remaining} steps remaining")
+                }
 
-            activityLogPanel.appendStatus('Thinking...')
+                activityLogPanel.appendStatus('Thinking...')
 
-            try {
-                ChatRequest request = new ChatRequest()
-                request.model = modelId
-                request.messages = messages
-                request.stream = false
+                try {
+                    ChatRequest request = new ChatRequest()
+                    request.model = modelId
+                    request.messages = messages
+                    request.stream = false
 
-                if (isLastStep) {
-                    // Last step: disable tools and inject max-steps prompt
-                    request.tools = []
+                    if (isLastStep) {
+                        // Last step: disable tools and inject max-steps prompt
+                        request.tools = []
 
-                    def maxStepsPrompt = loadMaxStepsPrompt()
-                    messages << new Message('assistant', maxStepsPrompt)
+                        def maxStepsPrompt = loadMaxStepsPrompt()
+                        messages << new Message('assistant', maxStepsPrompt)
 
-                    activityLogPanel.appendWarning('Maximum steps reached - requesting summary')
+                        activityLogPanel.appendWarning('Maximum steps reached - requesting summary')
                 } else {
-                    request.tools = allowedTools.collect { tool ->
-                        [
+                        request.tools = allowedTools.collect { tool ->
+                            [
                             type: 'function',
                             function: [
                                 name: tool.name,
@@ -736,23 +1007,23 @@ class LanternaTUI {
                                 parameters: tool.parameters
                             ]
                         ]
+                        }
                     }
-                }
 
-                activityLogPanel.removeStatus()
+                    activityLogPanel.removeStatus()
 
-                // Only start new streaming response if not continuing after tool calls
-                if (!continueAfterTools) {
-                    activityLogPanel.startStreamingResponse()
+                    // Only start new streaming response if not continuing after tool calls
+                    if (!continueAfterTools) {
+                        activityLogPanel.startStreamingResponse()
                 } else {
-                    // Continuing after tool execution - append directly without new prefix
-                    continueAfterTools = false
-                }
+                        // Continuing after tool execution - append directly without new prefix
+                        continueAfterTools = false
+                    }
 
-                // Use streaming for real-time display
-                StringBuilder fullResponseBuilder = new StringBuilder()
+                    // Use streaming for real-time display
+                    StringBuilder fullResponseBuilder = new StringBuilder()
 
-                client.streamMessageForTUI(request,
+                    client.streamMessageForTUI(request,
                     { String chunk ->
                         activityLogPanel.appendStreamChunk(chunk)
                         fullResponseBuilder.append(chunk)
@@ -791,7 +1062,12 @@ class LanternaTUI {
                                     int percentage = Math.min((totalTokens / 128000) * 100 as int, 100)
                                     int lspCount = SidebarLspManager.instance.getConnectedLspCount(sessionId)
 
-                                    updateHeader(inputTokens, outputTokens, percentage, cost, lspCount)
+                                    int subagentRunning = subagentManager.getActiveCount()
+                                    int subagentCompleted = subagentManager.getAllSessions().count { it.status == 'completed' }
+                                    int subagentTotal = subagentManager.getAllSessions().size()
+
+                                    updateHeader(inputTokens, outputTokens, percentage, cost, lspCount,
+                                              subagentRunning, subagentCompleted, subagentTotal)
                                     updateFooter()
                                     refreshSidebar()
                                 }
@@ -804,6 +1080,7 @@ class LanternaTUI {
                                 if (choice.finishReason == 'tool_calls' || (message.toolCalls != null && !message.toolCalls.isEmpty())) {
                                     // Add streaming content to messages
                                     messages << displayMessage
+                                    saveMessage(displayMessage)
 
                                     // Process tool calls from structured response
                                     message.toolCalls.each { toolCall ->
@@ -848,46 +1125,44 @@ class LanternaTUI {
                                 } else {
                                     // No tool calls, we are done
                                     messages << displayMessage
+                                    saveMessage(displayMessage)
                                     // Exit the while loop by setting iteration to maxIterations
                                     iteration = maxIterations
                                 }
                             } catch (Exception e) {
                                 activityLogPanel.appendError("Error processing tool calls: ${e.message}")
                             }
-                         } else {
-                              // No tools or last step, we are done
-                              def displayMessage = new Message()
-                              displayMessage.role = 'assistant'
-                              displayMessage.content = fullResponse
-                              messages << displayMessage
-                              // Exit the while loop by setting iteration to maxIterations
-                              iteration = maxIterations
+                          } else {
+                             // No tools or last step, we are done
+                             def displayMessage = new Message()
+                             displayMessage.role = 'assistant'
+                             displayMessage.content = fullResponse
+                             messages << displayMessage
+                             saveMessage(displayMessage)
+                             // Exit the while loop by setting iteration to maxIterations
+                             iteration = maxIterations
                          }
                     },
                     { stopRequested.get() }
                 ) // End of streamMessageForTUI
 
-                // If stopped, break out of the while loop
-                if (stopRequested.get()) {
-                    break
-                }
+                    // If stopped, break out of the while loop
+                    if (stopRequested.get()) {
+                        break
+                    }
 
-                // If we are not continuing after tools (and not stopped), we are done with this turn
-                if (!continueAfterTools) {
-                    break
-                }
-
+                    // If we are not continuing after tools (and not stopped), we are done with this turn
+                    if (!continueAfterTools) {
+                        break
+                    }
             } catch (Exception e) {
-                activityLogPanel.appendError("Error in chat request: ${e.message}")
+                    activityLogPanel.appendError("Error in chat request: ${e.message}")
             } finally {
-                activityLogPanel.removeStatus()
+                    activityLogPanel.removeStatus()
+                }
             }
-
-            }
-
         } catch (Exception e) {
             activityLogPanel.appendError("Error in conversation loop: ${e.message}")
-            e.printStackTrace()
         } finally {
             isGenerating.set(false)
             activityLogPanel.removeStatus()

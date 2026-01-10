@@ -87,7 +87,7 @@ class CollapsibleSection extends Panel {
         contentPanel.removeAllComponents()
     }
 
-    void addComponent(Component component) {
+    void addToContent(Component component) {
         contentPanel.addComponent(component)
     }
 

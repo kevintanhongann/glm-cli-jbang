@@ -32,6 +32,10 @@
 // H2 Database for session persistence
 //DEPS com.h2database:h2:2.2.224
 
+// MCP SDK Dependencies
+//DEPS io.modelcontextprotocol.sdk:mcp:0.17.0
+//DEPS io.projectreactor:reactor-core:3.6.6
+
 // Core sources
 // TODO: ZaiCodingPlanClient needs to be updated for new LangChain4j API
 // //SOURCES core/ZaiCodingPlanClient.groovy
@@ -68,7 +72,6 @@
 //SOURCES core/Subagent.groovy
 //SOURCES core/SubagentPool.groovy
 //SOURCES core/LSPManager.groovy
-//SOURCES tools/ReadFileTool.groovy
 //SOURCES tools/WriteFileTool.groovy
 //SOURCES tools/ListFilesTool.groovy
 //SOURCES tools/FetchUrlTool.groovy
@@ -80,35 +83,38 @@
 //SOURCES tools/TaskTool.groovy
 
 // RAG sources
-//SOURCES rag/CodebaseLoader.groovy
-//SOURCES rag/CodeChunker.groovy
-//SOURCES rag/EmbeddingService.groovy
-//SOURCES rag/RAGPipeline.groovy
 
-// Tool sources
-//SOURCES tools/Tool.groovy
-//SOURCES tools/ReadFileTool.groovy
-//SOURCES tools/WriteFileTool.groovy
-//SOURCES tools/ListFilesTool.groovy
-//SOURCES tools/FetchUrlTool.groovy
-//SOURCES tools/WebSearchTool.groovy
-//SOURCES tools/CodeSearchTool.groovy
-//SOURCES tools/GrepTool.groovy
-//SOURCES tools/GlobTool.groovy
-//SOURCES tools/BatchTool.groovy
-//SOURCES tools/EditTool.groovy
-//SOURCES tools/MultiEditTool.groovy
-//SOURCES tools/PatchTool.groovy
-//SOURCES tools/LSPTool.groovy
+// MCP sources
+//SOURCES mcp/McpConfig.groovy
+//SOURCES mcp/McpClientManager.groovy
+//SOURCES mcp/McpToolAdapter.groovy
+//SOURCES mcp/McpToolDiscovery.groovy
+//SOURCES mcp/McpResourceManager.groovy
+//SOURCES mcp/McpEventBus.groovy
+//SOURCES mcp/McpConnectionRetry.groovy
+//SOURCES mcp/OAuthCallbackServer.groovy
+//SOURCES mcp/OAuthTokenStorage.groovy
+//SOURCES commands/McpCommand.groovy
+//SOURCES commands/McpListCommand.groovy
+//SOURCES commands/McpAddCommand.groovy
+//SOURCES commands/McpRemoveCommand.groovy
+//SOURCES commands/McpConnectCommand.groovy
+//SOURCES commands/McpDisconnectCommand.groovy
+//SOURCES commands/McpDebugCommand.groovy
 
 // Agent source
 //SOURCES core/Agent.groovy
 //SOURCES core/SessionManager.groovy
 //SOURCES core/MessageStore.groovy
-//SOURCES core/TokenTracker.groovy
 //SOURCES core/FileTime.groovy
 //SOURCES core/ParallelExecutor.groovy
 //SOURCES core/ParallelProgressMonitor.groovy
+//SOURCES core/SummaryGenerator.groovy
+//SOURCES core/HistoryPruner.groovy
+//SOURCES core/SessionCompactor.groovy
+//SOURCES core/CompactionTrigger.groovy
+//SOURCES core/TokenCounter.groovy
+//SOURCES core/EventBus.groovy
 
 // Model sources
 //SOURCES models/Session.groovy
@@ -170,8 +176,6 @@
 //SOURCES core/JsonRpcHandler.groovy
 //SOURCES core/LSPConfig.groovy
 //SOURCES core/LSPServerRegistry.groovy
-//SOURCES core/LSPClient.groovy
-//SOURCES core/LSPManager.groovy
 //SOURCES core/DiagnosticFormatter.groovy
 
 import picocli.CommandLine

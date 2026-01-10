@@ -19,6 +19,7 @@ class SidebarPanel extends Panel {
     private TokenSection tokenSection
     private LspSection lspSection
     private ModifiedFilesSection modifiedFilesSection
+    private SubagentSection subagentSection
 
     private boolean expandedState = true
     private int width
@@ -46,6 +47,7 @@ class SidebarPanel extends Panel {
         tokenSection = new TokenSection(sessionId)
         lspSection = new LspSection(sessionId)
         modifiedFilesSection = new ModifiedFilesSection(sessionId)
+        subagentSection = new SubagentSection()
 
         buildUI()
     }
@@ -62,6 +64,7 @@ class SidebarPanel extends Panel {
             contentPanel.addComponent(tokenSection)
             contentPanel.addComponent(lspSection)
             contentPanel.addComponent(modifiedFilesSection)
+            contentPanel.addComponent(subagentSection)
 
             // Wrap in scrollable panel
             def scrollablePanel = new Panel()
@@ -163,6 +166,9 @@ class SidebarPanel extends Panel {
 
         modifiedFilesSection.refresh()
 
+        // Refresh subagent section
+        subagentSection.refresh()
+
         // Check if scroll indicator should be shown
         updateScrollIndicator()
     }
@@ -183,6 +189,10 @@ class SidebarPanel extends Panel {
         } else {
             showingScrollIndicator = false
         }
+    }
+
+    SubagentSection getSubagentSection() {
+        return subagentSection
     }
 
 }

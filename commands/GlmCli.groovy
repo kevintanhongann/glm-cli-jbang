@@ -9,7 +9,7 @@ import tui.Tui4jTUI
 
 @Command(name = 'glm', mixinStandardHelpOptions = true, version = 'glm-cli 1.0.0',
         description = 'GLM-4 based AI coding agent',
-        subcommands = [ChatCommand.class, AgentCommand.class, AuthCommand.class, InitCommand.class, SessionCommand.class, ModelsCommand.class, SkillCommand.class])
+        subcommands = [ChatCommand.class, AgentCommand.class, AuthCommand.class, InitCommand.class, SessionCommand.class, ModelsCommand.class, SkillCommand.class, McpCommand.class])
 class GlmCli implements Runnable {
 
     @Option(names = ['--simple'], description = 'Use simple console mode (no TUI)')

@@ -30,16 +30,16 @@ class SubagentPool {
                 def startTime = System.currentTimeMillis()
 
                 try {
-                    def result = agent.execute(task.prompt)
-                    def duration = System.currentTimeMillis() - startTime
+                    SubagentOutput output = agent.execute(task.prompt)
+                    def duration = output.duration
 
                     return new SubagentResult(
                         agentId: agentId.getAndIncrement(),
                         configName: task.config.name,
-                        result: result,
+                        result: output.content,
                         history: agent.history,
                         duration: duration,
-                        success: true
+                        success: output.success
                     )
                 } catch (Exception e) {
                     def duration = System.currentTimeMillis() - startTime

@@ -55,6 +55,7 @@ class Agent {
     private BatchTool batchTool
     private final SkillRegistry skillRegistry = new SkillRegistry()
     private SkillTool skillTool
+    private SessionCompactor sessionCompactor
 
     Agent(String apiKey, String model, String sessionId = null) {
         this.client = new GlmClient(apiKey, null, 'jwt')
@@ -62,10 +63,22 @@ class Agent {
         this.config = Config.load()
         this.subagentPool = new SubagentPool(client, tools)
         this.sessionManager = SessionManager.instance
-        this.messageStore = new MessageStore()
+        this.messageStore = MessageStore.instance
 
         AnsiColors.install()
         this.parallelExecutor = new ParallelExecutor(config.toolHeuristics?.maxParallelTools ?: 10)
+
+        // Initialize session compactor
+        this.sessionCompactor = SessionCompactor.instance
+        this.sessionCompactor.initialize(client, sessionManager)
+        
+        // Configure from settings
+        if (config.behavior?.maxContextTokens != null) {
+            this.sessionCompactor.maxContextTokens = config.behavior.maxContextTokens
+        }
+        if (config.behavior?.compactionThreshold != null) {
+            this.sessionCompactor.setCompactionThresholdPercent(config.behavior.compactionThreshold)
+        }
 
         registerTool(new TaskTool(subagentPool))
 
@@ -89,6 +102,8 @@ class Agent {
                 model
             )
         }
+
+        registerMcpTools()
     }
 
     void shutdown() {
@@ -168,6 +183,44 @@ class Agent {
         tools.add(tool)
     }
 
+    void registerMcpTools() {
+        try {
+            mcp.McpClientManager.instance.initialize()
+
+            if (config.behavior?.enableMcp == true || config.behavior?.enableMcp == null) {
+                Map<String, mcp.McpToolAdapter> mcpTools = mcp.McpToolDiscovery.discoverTools()
+
+                mcpTools.each { name, tool ->
+                    if (isMcpToolAllowed(name)) {
+                        tools.add(tool)
+                        OutputFormatter.printInfo("Registered MCP tool: ${name}")
+                    } else {
+                        OutputFormatter.printWarning("MCP tool '${name}' denied by permissions")
+                    }
+                }
+            }
+        } catch (Exception e) {
+            OutputFormatter.printError("Error loading MCP tools: ${e.message}")
+        }
+    }
+
+    private boolean isMcpToolAllowed(String toolName) {
+        def permissionConfig = config.permission
+        if (permissionConfig == null) return true
+
+        String pattern = permissionConfig.get(toolName)
+        if (pattern) {
+            return pattern != 'deny'
+        }
+
+        String wildcardPattern = permissionConfig.get('mcp_*')
+        if (wildcardPattern) {
+            return wildcardPattern != 'deny'
+        }
+
+        return true
+    }
+
     void registerTools(List<Tool> tools) {
         this.tools.addAll(tools)
     }
@@ -236,6 +289,25 @@ class Agent {
 
         while (true) {
             step++
+
+            // Check if session compaction is needed before making LLM call
+            if (config.behavior?.autoCompact != false && sessionCompactor != null) {
+                systemPrompt = loadSystemPrompt() ?: ""
+                def result = sessionCompactor.maybeCompact(
+                    sessionId, history, systemPrompt
+                )
+                
+                if (result.performed) {
+                    OutputFormatter.printInfo("Session compacted: ${result.tokensBefore} → ${result.tokensAfter} tokens (removed ${result.messagesRemoved} messages)")
+                    // Reload history from database after compaction
+                    def compactedMessages = messageStore.getMessages(sessionId)
+                    if (compactedMessages != null && !compactedMessages.isEmpty()) {
+                        // Only update history with new compacted version
+                        history.clear()
+                        history.addAll(compactedMessages)
+                    }
+                }
+            }
 
             ChatRequest request = prepareRequest()
 

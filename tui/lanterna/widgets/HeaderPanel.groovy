@@ -10,6 +10,7 @@ class HeaderPanel extends Panel {
     private Label contextLabel
     private Label costLabel
     private Label lspStatusLabel
+    private Label subagentStatusLabel
     private Panel leftPanel
     private Panel rightPanel
 
@@ -42,6 +43,12 @@ class HeaderPanel extends Panel {
         lspStatusLabel = new Label('')
         lspStatusLabel.setForegroundColor(TextColor.ANSI.GREEN)
         rightPanel.addComponent(lspStatusLabel)
+
+        rightPanel.addComponent(new Label('  '))
+
+        subagentStatusLabel = new Label('')
+        subagentStatusLabel.setForegroundColor(TextColor.ANSI.YELLOW)
+        rightPanel.addComponent(subagentStatusLabel)
     }
 
     void updateContext(int inputTokens, int outputTokens, int percentage, BigDecimal cost) {
@@ -66,17 +73,40 @@ class HeaderPanel extends Panel {
         }
     }
 
+    void updateSubagentStatus(int running, int completed, int total) {
+        if (total > 0) {
+            String text
+            if (running > 0) {
+                text = "🤖 ${running}/${total} running"
+            } else if (completed == total) {
+                text = "✓ ${total} complete"
+            } else {
+                text = "🤖 ${completed}/${total} complete"
+            }
+            subagentStatusLabel.setText(text)
+        } else {
+            subagentStatusLabel.setText('')
+        }
+    }
+
     void updateTitle(String title) {
         titleLabel.setText(title)
+    }
+
+    void updateModel(String model) {
+        titleLabel.setText("GLM CLI - ${model}")
     }
 
     void setSessionTitle(String sessionTitle) {
         titleLabel.setText(sessionTitle)
     }
 
-    void update(int inputTokens, int outputTokens, int percentage, BigDecimal cost, int lspCount = 0, int lspErrors = 0) {
+    void update(int inputTokens, int outputTokens, int percentage, BigDecimal cost,
+               int lspCount = 0, int lspErrors = 0, int subagentRunning = 0,
+               int subagentCompleted = 0, int subagentTotal = 0) {
         updateContext(inputTokens, outputTokens, percentage, cost)
         updateLspStatus(lspCount, lspErrors)
+        updateSubagentStatus(subagentRunning, subagentCompleted, subagentTotal)
     }
 
 }

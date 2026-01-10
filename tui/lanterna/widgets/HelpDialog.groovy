@@ -3,7 +3,7 @@ package tui.lanterna.widgets
 import com.googlecode.lanterna.TextColor
 import com.googlecode.lanterna.gui2.*
 
-class HelpDialog extends DialogWindow {
+class HelpDialog extends BasicWindow {
 
     HelpDialog(MultiWindowTextGUI textGUI) {
         super('Help - Keyboard Shortcuts & Commands')
@@ -34,6 +34,7 @@ class HelpDialog extends DialogWindow {
         ])
 
         addSection(mainPanel, 'Keyboard Shortcuts', [
+            ['Ctrl+P', 'Open command palette'],
             ['Ctrl+M', 'Open model selection dialog'],
             ['Ctrl+S', 'Export chat log'],
             ['Ctrl+L', 'Clear chat history'],

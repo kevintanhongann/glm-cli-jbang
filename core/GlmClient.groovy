@@ -181,7 +181,6 @@ class GlmClient {
         client.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofLines())
             .thenAccept { response ->
                 if (response.statusCode() != 200) {
-                    // Ideally read body to get error, but streaming response body is a stream
                     throw new RuntimeException("API Request failed with code ${response.statusCode()}")
                 }
 
@@ -217,19 +216,17 @@ class GlmClient {
 
         StringBuilder fullResponse = new StringBuilder()
 
-        // We use a CompletableFuture to allow for cancellation from the caller's side indirectly
-        // although standard Java HTTP Client async doesn't support easy interruption of the stream processing
-        // once started, we can stop processing the *lines*.
-
         client.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofLines())
             .thenAccept { response ->
                 if (response.statusCode() != 200) {
-                    throw new RuntimeException("API Request failed with code ${response.statusCode()}")
+                    String errorBody = response.body().join("\n").trim()
+                    String errorMsg = "API Request failed with code ${response.statusCode()}"
+                    if (errorBody) {
+                        errorMsg += ": ${errorBody}"
+                    }
+                    onComplete.call("")
+                    throw new RuntimeException(errorMsg)
                 }
-
-                // We can't easily "break" from forEach, so we use an iterator or check inside
-                // But specifically for Stream, we can use takeWhile but that's Java 9+ (we are on JBang/Java usually recent)
-                // Or just loop regularly.
 
                 try {
                     response.body().takeWhile { _ -> !shouldStop.get() }.forEach { line ->
@@ -248,18 +245,19 @@ class GlmClient {
                                     }
                                 }
                             } catch (Exception e) {
-                            // Ignore parsing errors for empty lines or keepalives
                             }
                         }
-                }
+                    }
                 } catch (Exception e) {
-            // unexpected stream error
-            }
+                }
 
-                // Call completion callback with full response gathered so far
                 onComplete.call(fullResponse.toString())
-}
-            .join() // Wait for completion
+            }
+            .exceptionally { ex ->
+                onComplete.call("")
+                return null
+            }
+            .join()
     }
 
 }

@@ -34,6 +34,9 @@ class Config {
     @JsonProperty('parallel_execution')
     ParallelExecutionConfig parallelExecution = new ParallelExecutionConfig()
 
+    @JsonProperty('subagent')
+    SubagentConfig subagent = new SubagentConfig()
+
     @JsonProperty('provider')
     Map<String, ProviderConfig> provider = [:]
 
@@ -42,6 +45,12 @@ class Config {
 
     @JsonProperty('skills')
     SkillConfig skills = new SkillConfig()
+
+    @JsonProperty('mcp')
+    McpConfig mcp = new McpConfig()
+
+    @JsonProperty('permission')
+    Map<String, String> permission = [:]
 
     static class ApiConfig {
 
@@ -64,6 +73,14 @@ class Config {
         List<String> recentModels = []
         @JsonProperty('favorite_models')
         List<String> favoriteModels = []
+        
+        // Session compaction settings
+        @JsonProperty('max_context_tokens')
+        Integer maxContextTokens = 8000
+        @JsonProperty('compaction_threshold')
+        Integer compactionThreshold = 75  // Percentage at which to trigger compaction
+        @JsonProperty('auto_compact')
+        Boolean autoCompact = true  // Automatically compact when threshold reached
 
     }
 
@@ -158,8 +175,37 @@ class Config {
         }
     }
 
+    static class SubagentConfig {
+        @JsonProperty('max_concurrent_subagents')
+        Integer maxConcurrentSubagents = 5
+        @JsonProperty('subagent_timeout')
+        Integer subagentTimeout = 300
+        @JsonProperty('enable_parallel_subagents')
+        Boolean enableParallelSubagents = true
+        @JsonProperty('show_subagent_progress')
+        Boolean showSubagentProgress = true
+    }
+
+    static class McpConfig {
+        @JsonProperty('enabled')
+        Boolean enabled = true
+        @JsonProperty('auto_connect')
+        Boolean autoConnect = true
+        @JsonProperty('connection')
+        ConnectionConfig connection = new ConnectionConfig()
+    }
+
+    static class ConnectionConfig {
+        @JsonProperty('max_retries')
+        Integer maxRetries = 3
+        @JsonProperty('initial_delay')
+        Long initialDelay = 1000
+        @JsonProperty('max_delay')
+        Long maxDelay = 30000
+    }
+
     List<String> getSkillPermissionPatterns() {
-        return behavior?.skill_permissions ?: ['*']
+        return skills?.skillPermissions?.values()?.toList() ?: ['*']
     }
 
     boolean isSkillAllowed(String skillName) {
@@ -169,6 +215,24 @@ class Config {
                 return pattern != 'deny'
             }
         }
+        return true
+    }
+
+    boolean isMcpToolAllowed(String toolName) {
+        if (permission == null) return true
+
+        def exactMatch = permission.get(toolName)
+        if (exactMatch != null) {
+            return exactMatch != 'deny'
+        }
+
+        def wildcardMatch = permission.find { key, value ->
+            key.endsWith('*') && toolName.startsWith(key[0..-2])
+        }
+        if (wildcardMatch) {
+            return wildcardMatch.value != 'deny'
+        }
+
         return true
     }
 
